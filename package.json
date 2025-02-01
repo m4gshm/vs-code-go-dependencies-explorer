@@ -12,19 +12,15 @@
   "activationEvents": [
     "onLanguage:go",
     "onLanguage:go.sum",
-    "onLanguage:gotmpl",
-    "onDebugInitialConfigurations",
-    "onDebugResolve:go",
-    "onWebviewPanel:welcomeGo"
+    "onLanguage:gotmpl"
   ],
   "main": "./out/extension.js",
   "contributes": {
     "views": {
       "explorer": [
         {
-          "id": "go.dependencies",
-          "name": "dependencies",
-          "when": "go.showExplorer"
+          "id": "go.dependencies.explorer",
+          "name": "dependencies"
         }
       ]
     },
@@ -41,6 +37,7 @@
   "devDependencies": {
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
+    "@types/semver": "^7.5.8",
     "@types/vscode": "^1.96.0",
     "@typescript-eslint/eslint-plugin": "^8.17.0",
     "@typescript-eslint/parser": "^8.17.0",

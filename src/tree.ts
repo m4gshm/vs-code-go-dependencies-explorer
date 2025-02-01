@@ -1,24 +1,30 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
-import * as path from 'path';
+import { getDependencyDirs } from './go';
+import { DirHierarchyBuilder as DirHierarchyBuilder, Directory } from './dir';
+
 
 export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
-  constructor(ctx: vscode.ExtensionContext) { }
+  private readonly workspaceState: vscode.Memento;
+  private readonly dirs: Directory[];
 
+  constructor(ctx: vscode.ExtensionContext) {
+    this.workspaceState = ctx.workspaceState;
+    let dirPaths = getDependencyDirs();
+    let hierarchy = DirHierarchyBuilder.create(dirPaths);
+    let rootDir = hierarchy.getRoot();
+    this.dirs = rootDir.name ? [rootDir] : rootDir.subdirs;
+  }
 
   static setup(ctx: vscode.ExtensionContext) {
     const provider = new this(ctx);
-    const {
-      window: { registerTreeDataProvider },
-      commands: { registerCommand, executeCommand }
-    } = vscode;
     ctx.subscriptions.push(
-      vscode.window.registerTreeDataProvider('go.explorer', provider)//,
-      // registerCommand('go.explorer.refresh', () => provider.update(true)),
-      // registerCommand('go.explorer.open', (item) => provider.open(item)),
+      vscode.window.registerTreeDataProvider('go.dependencies.explorer', provider)//,
+      // registerCommand('go.dependencies.explorer.refresh', () => provider.update(true)),
+      // registerCommand('go.dependencies.explorer.open', (item) => provider.open(item)),
       // registerCommand('go.workspace.editEnv', (item) => provider.editEnv(item)),
       // registerCommand('go.workspace.resetEnv', (item) => provider.resetEnv(item))
     );
+    // vscode.commands.executeCommand('setContext', 'go.showExplorer', true);
     return provider;
   }
 
@@ -27,28 +33,22 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
   }
 
   getChildren(element?: vscode.TreeItem): Thenable<vscode.TreeItem[]> {
-    // if (!this.workspaceRoot) {
-    vscode.window.showInformationMessage('No dependency in empty workspace');
-    return Promise.resolve([]);
-    // }
-
-    if (element) {
-      return Promise.resolve([]);
-      // return Promise.resolve(
-      //   this.getDepsInPackageJson(
-      //     path.join(this.workspaceRoot, 'node_modules', element.label, 'package.json')
-      //   )
-      // );
+    if (element as GoDirItem) {
+      let dirItem = element as GoDirItem;
+      let dir = dirItem.dir;
+      return Promise.resolve(dir.subdirs.map(d => new GoDirItem(d)));
+    } else if (!element) {
+      return Promise.resolve(Array.from(this.dirs).map(m => new GoDirItem(m)));
     } else {
-      // const packageJsonPath = path.join(this.workspaceRoot, 'package.json');
-      // if (this.pathExists(packageJsonPath)) {
-      //   return Promise.resolve(this.getDepsInPackageJson(packageJsonPath));
-      // } else {
-      //   vscode.window.showInformationMessage('Workspace has no package.json');
-      //   return Promise.resolve([]);
-      // }
+      return Promise.resolve([]);
     }
   }
 }
 
-
+class GoDirItem extends vscode.TreeItem {
+  constructor(
+    public readonly dir: Directory,
+  ) {
+    super(dir.name || "", vscode.TreeItemCollapsibleState.Collapsed);
+  }
+}
