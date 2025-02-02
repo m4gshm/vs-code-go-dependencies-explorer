@@ -1,4 +1,5 @@
 'use strict';
+import path from 'node:path';
 
 export class DirHierarchyBuilder {
     public static create(dirPaths: string[]): DirHierarchyBuilder {
@@ -6,16 +7,18 @@ export class DirHierarchyBuilder {
         for (let dirPath of dirPaths) {
             var dir: DirHierarchyBuilder | undefined = hierarchy;
             let subdirs = dir.subdirs;
-            let parts = dirPath.split(pathDelim()).filter(p => p.length > 0);
+            let parts = dirPath.split(path.sep);
             for (var i = 0; i < parts.length; i++) {
                 let part = parts[i];
-                dir = subdirs.get(part);
-                if (!dir) {
-                    let lastPart = i === parts.length - 1;
-                    dir = new DirHierarchyBuilder(part, lastPart ? dirPath : undefined, new Map());
-                    subdirs.set(part, dir);
+                if (part.length > 0 || i === 0) {
+                    dir = subdirs.get(part);
+                    if (!dir) {
+                        let lastPart = i === parts.length - 1;
+                        dir = new DirHierarchyBuilder(part, lastPart ? dirPath : undefined, new Map());
+                        subdirs.set(part, dir);
+                    }
+                    subdirs = dir.subdirs;
                 }
-                subdirs = dir.subdirs;
             }
         }
         hierarchy.collapse();
@@ -32,17 +35,17 @@ export class DirHierarchyBuilder {
         while (subdirs.size === 1) {
             let first = subdirs.values().next().value!!;
             var n = this.name;
-            this.name = (n || "") + pathDelim() + first.name;
+            this.name = (n ? n + path.sep : "") + first.name;
             this.path = first.path;
             subdirs = first.subdirs;
             this.subdirs = subdirs;
         }
-        let isRoot = !this.name;
+        // let isRoot = !this.name;
         subdirs.forEach(subdir => {
             subdir.collapse();
-            if (isRoot) {
-                subdir.name = pathDelim() + subdir.name;
-            }
+            // if (isRoot) {
+            //     subdir.name = path.sep + subdir.name;
+            // }
         });
     }
 
@@ -59,8 +62,3 @@ export class Directory {
     ) {
     }
 }
-
-function pathDelim(): string {
-    return "/";
-}
-
