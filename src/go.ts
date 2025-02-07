@@ -1,16 +1,16 @@
-'use strict';
-
-import * as vscode from 'vscode';
 import cp from 'child_process';
+import { URL } from 'url';
 
-export function getDependencyDirs(): string[] {
-    const strResult = execGo('list', '-f', '{{.Dir}}', 'all');
+type WorkDir = string |  URL | undefined;
+
+export function getDependencyDirs(workDir: WorkDir = undefined): string[] {
+    const strResult = execGo(['list', '-f', '{{.Dir}}', 'all'], workDir);
     const modules = strResult.split('\n').filter(module => module.length > 0);
     return modules;
 }
 
-export function getDependencies(): string[] {
-    const strResult = execGo('list', '-m', '-f', '{{.Path}}', 'all');
+export function getDependencies(workDir: WorkDir): string[] {
+    const strResult = execGo(['list', '-m', '-f', '{{.Path}}', 'all'], workDir);
     const modules = strResult.split('\n').filter(module => module.length > 0);
     return modules;
 }
@@ -26,38 +26,31 @@ export class ModuleInfo {
     }
 }
 
-export function getModuleInfo(moduleName: string): ModuleInfo {
-    let strResult = execGo('list', '-m', '--json', `${moduleName}`);
+export function getModuleInfo(moduleName: string, workDir: WorkDir): ModuleInfo {
+    let strResult = execGo(['list', '-m', '--json', `${moduleName}`], workDir);
     var rawJson = JSON.parse(strResult);
     return rawJson as ModuleInfo;
 
 }
 
-function execGo(...args: string[]) {
-    return exec(goExecPath(), args, getWorkspaceUrl());
+function execGo(args: string[], workDir: WorkDir): string {
+    return exec(goExecPath(), args, workDir);
 }
 
 function goExecPath() {
     return 'go';
 }
 
-function getWorkspaceUrl() {
-    const workspace = vscode.workspace.workspaceFolders?.[0];
-    const uri = workspace?.uri;
-    const workspaceUrl = uri ? new URL(uri) : undefined;
-    return workspaceUrl;
-}
-
-function exec(command: string, args: string[], workspaceUrl: import("url").URL | undefined = undefined) {
+function exec(command: string, args: string[], workDir: WorkDir): string {
     let strResult: string;
     try {
-        const rawResult = cp.execFileSync(command, args, { cwd: workspaceUrl });
+        const rawResult = cp.execFileSync(command, args, { cwd: workDir });
         strResult = `${rawResult}`;
     } catch (err) {
         if (typeof err === "string") {
-            throw Error(`failed to run "${command} ${args}": ${err} cwd: ${workspaceUrl}`);
+            throw Error(`failed to run "${command} ${args}": ${err} cwd: ${workDir}`);
         } else if (err instanceof Error) {
-            throw Error(`failed to run "${command} ${args}": ${err.message} cwd: ${workspaceUrl}`);
+            throw Error(`failed to run "${command} ${args}": ${err.message} cwd: ${workDir}`);
         }
         throw err;
     }

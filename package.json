@@ -1,5 +1,5 @@
 {
-  "name": "vs-code-files-tree",
+  "name": "vs-code-go-dependencies-explorer",
   "displayName": "",
   "description": "",
   "version": "0.0.1",
@@ -16,14 +16,6 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
-    "views": {
-      "explorer": [
-        {
-          "id": "go.dependencies.explorer",
-          "name": "dependencies"
-        }
-      ]
-    },
     "commands": []
   },
   "scripts": {

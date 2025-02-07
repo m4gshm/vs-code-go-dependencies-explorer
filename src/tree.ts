@@ -1,21 +1,19 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
 import { getDependencyDirs } from './go';
-import { DirHierarchyBuilder as DirHierarchyBuilder, Directory } from './dir';
-
+import {  Directory } from './dir';
+import { GoDependenciesFS as GoDependenciesFS } from './fs';
 
 export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
-  private readonly workspaceState: vscode.Memento;
   private readonly dirs: Directory[];
 
   constructor(ctx: vscode.ExtensionContext) {
-    this.workspaceState = ctx.workspaceState;
     let dirPaths = getDependencyDirs();
-    let hierarchy = DirHierarchyBuilder.create(dirPaths);
-    let rootDir = hierarchy.getRoot();
-    this.dirs = rootDir.name ? [rootDir] : rootDir.subdirs;
+    this.dirs = Directory.create(dirPaths);
   }
 
   static setup(ctx: vscode.ExtensionContext) {
+
     const provider = new this(ctx);
     ctx.subscriptions.push(
       vscode.window.registerTreeDataProvider('go.dependencies.explorer', provider)//,
@@ -36,7 +34,10 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
     if (element as GoDirItem) {
       let dirItem = element as GoDirItem;
       let dir = dirItem.dir;
-      return Promise.resolve(dir.subdirs.map(d => new GoDirItem(d)));
+      let path = dir.path;
+      let files: vscode.TreeItem[] = path ? fs.readdirSync(path).map(fileName => new FileItem(fileName)) : [];
+      let subdirs: vscode.TreeItem[] = dir.subdirs.map(d => new GoDirItem(d));
+      return Promise.resolve([...subdirs, ...files]);
     } else if (!element) {
       return Promise.resolve(Array.from(this.dirs).map(m => new GoDirItem(m)));
     } else {
@@ -46,9 +47,19 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
 }
 
 class GoDirItem extends vscode.TreeItem {
+  iconPath = new vscode.ThemeIcon('symbol-folder');
   constructor(
     public readonly dir: Directory,
   ) {
     super(dir.name || "", vscode.TreeItemCollapsibleState.Collapsed);
+  }
+}
+
+class FileItem extends vscode.TreeItem {
+  iconPath = vscode.ThemeIcon.File;
+  constructor(
+    public readonly fileName: string,
+  ) {
+    super(fileName);
   }
 }
