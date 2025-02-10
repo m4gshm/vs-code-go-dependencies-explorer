@@ -1,16 +1,17 @@
-import { sep, parse } from 'path';
+import { sep, parse, join } from 'path';
 
 export class Directory {
     constructor(
         public readonly root: boolean,
         public readonly name: string,
-        public readonly path: string | undefined,
+        public readonly parent: string | undefined,
+        public readonly goPath: string | undefined,
         public readonly subdirs: Directory[]
     ) {
     }
 
     public static create(dirPaths: string[]) {
-        let roots = new Map<string | undefined, DirHierarchyBuilder>();
+        const roots = new Map<string, DirHierarchyBuilder>();
         for (let dirPath of dirPaths) {
             let root = DirHierarchyBuilder.newHierarchyBuilder(dirPath);
             if (root) {
@@ -22,7 +23,9 @@ export class Directory {
                 }
             }
         }
-        return Array.from(roots.values()).map(d => d.toDirectory());
+
+        const collapsedRoots = collapse(roots);
+        return Array.from(collapsedRoots.values()).map(d => d.toDirectory());
     }
 
     public flatDirs(): Map<string, Directory> {
@@ -39,7 +42,6 @@ export class Directory {
         if (this.root) {
             let rootPair: [string, Directory] = [this.name, this as Directory];
             result.push(rootPair);
-            // result = [rootPair].concat(...result);
         }
         return new Map(result);
     }
@@ -69,7 +71,7 @@ class DirHierarchyBuilder {
         }
 
         if (first && first.name?.length && first.name?.length > 0) {
-            let root = new DirHierarchyBuilder(true, first.parentPath, undefined, undefined, new Map());
+            let root = new DirHierarchyBuilder(true, first.parentPath || "", undefined, undefined, new Map());
             first.root = false;
             root.subdirs.set(first.name, first);
             return root;
@@ -80,9 +82,9 @@ class DirHierarchyBuilder {
 
     constructor(
         public root: boolean,
-        public name: string | undefined,
+        public name: string,
         public parentPath: string | undefined,
-        public path: string | undefined,
+        public goPath: string | undefined,
         public subdirs: Map<string, DirHierarchyBuilder>
     ) {
     }
@@ -99,6 +101,30 @@ class DirHierarchyBuilder {
     }
 
     public toDirectory(): Directory {
-        return new Directory(this.root, this.name!!, this.path, Array.from(this.subdirs.values()).map(d => d.toDirectory()));
+        return new Directory(this.root, this.name!!, this.parentPath, this.goPath, Array.from(this.subdirs.values()).map(d => d.toDirectory()));
     }
 }
+
+function collapse(roots: Map<string, DirHierarchyBuilder>) {
+    return new Map(Array.from(roots.entries()).map((e: [string, DirHierarchyBuilder]) => {
+        const [fullPath, dir] = e;
+        return collpase(fullPath, dir);
+    }));
+}
+
+function collpase(name: string, dir: DirHierarchyBuilder): [string, DirHierarchyBuilder] {
+    const subdirs = dir.subdirs;
+    const collapsedSubdirs = collapse(subdirs);
+
+    const single = collapsedSubdirs.size === 1;
+    if (single) {
+        const [subdirName, subdir] = collapsedSubdirs.entries().next().value!!;
+        const collapsedSubdirName = dir.name ? join(dir.name, subdirName) : subdirName;
+        subdir.name = collapsedSubdirName;
+        return [collapsedSubdirName, subdir];
+    }
+    
+    dir.subdirs = collapsedSubdirs;
+    return [name, dir];
+}
+

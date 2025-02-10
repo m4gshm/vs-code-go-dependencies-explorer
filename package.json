@@ -16,7 +16,20 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
-    "commands": []
+    "views": {
+      "explorer": [
+        {
+          "id": "go.dependencies.explorer",
+          "name": "dependencies"
+        }
+      ]
+    },
+    "commands": [
+    ],
+    "menus": {
+      "commandPalette": [
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
