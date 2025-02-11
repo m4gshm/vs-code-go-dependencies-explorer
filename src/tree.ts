@@ -6,23 +6,19 @@ import { parse, join } from 'path';
 export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
   private readonly roots: Directory[];
   private readonly flatDirs: Map<string, Directory>;
+  private readonly treeView: vscode.TreeView<vscode.TreeItem>;
 
   constructor(ctx: vscode.ExtensionContext, dirs: Directory[], flatDirs: Map<string, Directory>) {
     this.roots = dirs;
     this.flatDirs = flatDirs;
-  }
 
-  static async setup(ctx: vscode.ExtensionContext, dirs: Directory[]) {
-    let flatDirs = new Map((dirs.flatMap(d => [...d.flatDirs().entries()])));
-    const provider = new this(ctx, dirs, flatDirs);
-
-    const treeView = vscode.window.createTreeView("go.dependencies.explorer", {
+    this.treeView = vscode.window.createTreeView("go.dependencies.explorer", {
       showCollapseAll: true,
-      treeDataProvider: provider,
+      treeDataProvider: this,
     });
-    ctx.subscriptions.push(treeView);
+    ctx.subscriptions.push(this.treeView);
 
-    treeView.onDidChangeSelection(event => {
+    this.treeView.onDidChangeSelection(event => {
       const selections = event.selection;
       for (const selection of selections) {
         const fileUri = selection.resourceUri;
@@ -34,31 +30,48 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
       }
     });
 
-    vscode.window.tabGroups.onDidChangeTabs(async tabs => {
+    const t = this;
+    vscode.window.tabGroups.onDidChangeTabs(tabs => {
       for (const tab of tabs.opened) {
-        await selectIfDependency(tab);
+        t.showActiveTabInTree(tab);
       }
       for (const tab of tabs.changed) {
-        await selectIfDependency(tab);
+        t.showActiveTabInTree(tab);
       }
-
-      async function selectIfDependency(tab: vscode.Tab) {
-        if (tab.isActive) {
-          const input = tab.input;
-          const textInput = input instanceof vscode.TabInputText ? input as vscode.TabInputText : undefined;
-          if (textInput) {
-            const fsPath = textInput.uri.fsPath;
-            const filePath = parse(fsPath);
-            const dir = filePath.dir;
-            if (flatDirs.get(dir)) {
-              await treeView.reveal({
-                id: fsPath,
-              } as vscode.TreeItem);
-            }
-          }
-        }
+      function selectIfDependency(tab: vscode.Tab) {
+        t.showActiveTabInTree(tab);
       }
     });
+
+    const activeTab = vscode.window.tabGroups.activeTabGroup.activeTab;
+    if (activeTab) {
+      t.showActiveTabInTree(activeTab);
+    }
+  }
+
+  private showActiveTabInTree(tab: vscode.Tab) {
+    if (tab.isActive) {
+      const input = tab.input;
+      const textInput = input instanceof vscode.TabInputText ? input as vscode.TabInputText : undefined;
+      if (textInput) {
+        const fsPath = textInput.uri.fsPath;
+        const filePath = parse(fsPath);
+        const dir = filePath.dir;
+        if (this.flatDirs.get(dir)) {
+          this.treeView.reveal({
+            id: fsPath,
+            focus: true,
+            select: true,
+          } as vscode.TreeItem);
+        }
+      }
+    }
+  }
+
+  static async setup(ctx: vscode.ExtensionContext, dirs: Directory[]) {
+    let flatDirs = new Map((dirs.flatMap(d => [...d.flatDirs().entries()])));
+    const provider = new this(ctx, dirs, flatDirs);
+
     return provider;
   }
 
