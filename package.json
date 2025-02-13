@@ -25,9 +25,17 @@
       ]
     },
     "commands": [
+      {
+        "command": "go.dependencies.open.in.integrated.terminal",
+        "title": "Open in Integrated Terminal"
+      }
     ],
     "menus": {
-      "commandPalette": [
+      "view/item/context": [
+        {
+          "when": "view == 'go.dependencies.explorer'",
+          "command": "go.dependencies.open.in.integrated.terminal"
+        }
       ]
     }
   },

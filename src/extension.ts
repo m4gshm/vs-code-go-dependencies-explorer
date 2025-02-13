@@ -12,6 +12,7 @@ export function activate(context: vscode.ExtensionContext) {
     }));
 
     let dirs = Directory.create(dependencyDirs);
+
     GoDependenciesTreeProvider.setup(context, dirs);
 }
 

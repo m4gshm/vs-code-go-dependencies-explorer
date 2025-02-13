@@ -7,18 +7,18 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
   private readonly roots: Directory[];
   private readonly flatDirs: Map<string, Directory>;
   private readonly treeView: vscode.TreeView<vscode.TreeItem>;
+  private treeVisible = false;
 
   constructor(ctx: vscode.ExtensionContext, dirs: Directory[], flatDirs: Map<string, Directory>) {
     this.roots = dirs;
     this.flatDirs = flatDirs;
 
     this.treeView = vscode.window.createTreeView("go.dependencies.explorer", {
-      showCollapseAll: true,
-      treeDataProvider: this,
+      showCollapseAll: true, treeDataProvider: this,
     });
     ctx.subscriptions.push(this.treeView);
 
-    this.treeView.onDidChangeSelection(event => {
+    ctx.subscriptions.push(this.treeView.onDidChangeSelection(event => {
       const selections = event.selection;
       for (const selection of selections) {
         const fileUri = selection.resourceUri;
@@ -28,28 +28,55 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
           );
         }
       }
-    });
+    }));
 
-    const t = this;
+    ctx.subscriptions.push(this.treeView.onDidChangeVisibility(async event => {
+      const visible = event.visible;
+      this.treeVisible = visible;
+      if (this.treeVisible) {
+        this.syncActiveTabWithTree();
+      }
+    }));
+
     vscode.window.tabGroups.onDidChangeTabs(tabs => {
-      for (const tab of tabs.opened) {
-        t.showActiveTabInTree(tab);
-      }
-      for (const tab of tabs.changed) {
-        t.showActiveTabInTree(tab);
-      }
-      function selectIfDependency(tab: vscode.Tab) {
-        t.showActiveTabInTree(tab);
+      if (this.treeVisible) {
+        for (const tab of tabs.opened) {
+          this.showFileOfActiveTabInTree(tab);
+        }
+        for (const tab of tabs.changed) {
+          this.showFileOfActiveTabInTree(tab);
+        }
       }
     });
 
+    this.syncActiveTabWithTree();
+
+    vscode.commands.registerCommand("go.dependencies.open.in.integrated.terminal", async item => {
+      if (item instanceof FileItem) {
+        const uri = vscode.Uri.file(item.filePath);
+        await vscode.commands.executeCommand('openInIntegratedTerminal', uri);
+      } else if (item instanceof GoDirItem) {
+        const path = item.id;
+        if (path) {
+          const uri = vscode.Uri.file(path);
+          await vscode.commands.executeCommand('openInIntegratedTerminal', uri);
+        } else {
+          console.warn("undefined path of item: " + item);
+        }
+      } else {
+        console.warn("unexpected item type: " + item);
+      }
+    });
+  }
+
+  private syncActiveTabWithTree() {
     const activeTab = vscode.window.tabGroups.activeTabGroup.activeTab;
     if (activeTab) {
-      t.showActiveTabInTree(activeTab);
+      this.showFileOfActiveTabInTree(activeTab);
     }
   }
 
-  private showActiveTabInTree(tab: vscode.Tab) {
+  private showFileOfActiveTabInTree(tab: vscode.Tab) {
     if (tab.isActive) {
       const input = tab.input;
       const textInput = input instanceof vscode.TabInputText ? input as vscode.TabInputText : undefined;
@@ -58,6 +85,7 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
         const filePath = parse(fsPath);
         const dir = filePath.dir;
         if (this.flatDirs.get(dir)) {
+          vscode.commands.executeCommand("workbench.action.files.setActiveEditorReadonlyInSession");
           this.treeView.reveal({
             id: fsPath,
             focus: true,
