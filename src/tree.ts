@@ -9,6 +9,12 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
   private readonly treeView: vscode.TreeView<vscode.TreeItem>;
   private treeVisible = false;
 
+  static async setup(ctx: vscode.ExtensionContext, dirs: Directory[]) {
+    let flatDirs = new Map((dirs.flatMap(d => [...d.flatDirs().entries()])));
+    const provider = new this(ctx, dirs, flatDirs);
+    return provider;
+  }
+
   constructor(ctx: vscode.ExtensionContext, dirs: Directory[], flatDirs: Map<string, Directory>) {
     this.roots = dirs;
     this.flatDirs = flatDirs;
@@ -86,7 +92,7 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
         const dir = filePath.dir;
         if (this.flatDirs.get(dir)) {
           vscode.commands.executeCommand("workbench.action.files.setActiveEditorReadonlyInSession");
-          this.treeView.reveal({
+          this.treeView?.reveal({
             id: fsPath,
             focus: true,
             select: true,
@@ -94,13 +100,6 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
         }
       }
     }
-  }
-
-  static async setup(ctx: vscode.ExtensionContext, dirs: Directory[]) {
-    let flatDirs = new Map((dirs.flatMap(d => [...d.flatDirs().entries()])));
-    const provider = new this(ctx, dirs, flatDirs);
-
-    return provider;
   }
 
   getTreeItem(element: vscode.TreeItem): vscode.TreeItem {
@@ -154,6 +153,10 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
       }
     }
     return undefined;
+  }
+
+  dispose() {
+    this.treeView?.dispose();
   }
 }
 

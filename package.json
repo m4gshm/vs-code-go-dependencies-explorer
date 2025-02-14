@@ -12,7 +12,10 @@
   "activationEvents": [
     "onLanguage:go",
     "onLanguage:go.sum",
-    "onLanguage:gotmpl"
+    "onLanguage:gotmpl",
+    "onDebugInitialConfigurations",
+    "onDebugResolve:go",
+    "onWebviewPanel:welcomeGo"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -20,7 +23,9 @@
       "explorer": [
         {
           "id": "go.dependencies.explorer",
-          "name": "dependencies"
+          "name": "Dependencies",
+          "visibility": "hidden",
+          "when": "go.showExplorer"
         }
       ]
     },
