@@ -10,7 +10,6 @@ export async function activate(context: vscode.ExtensionContext) {
     // const goPaths = new Set(await execGoCmd('go.gopath', fileDirs));
     // const goRoots = new Set(await execGoCmd('go.goroot', fileDirs));
     // const goTools = new Set(await execGoCmd('go.locate.tools', fileDirs));
-    // console.log(vscode.extensions.all.map(e => e.id));
 
     const goExtension = vscode.extensions.getExtension('golang.go');
     if (!goExtension) {
