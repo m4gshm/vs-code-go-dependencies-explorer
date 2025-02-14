@@ -31,10 +31,10 @@ export class Directory {
     public flatDirs(): Map<string, Directory> {
         let result = this.subdirs.flatMap(subdir => {
             let parent = (this.name !== sep ? this.name : "");
-            let path = parent + sep + subdir.name;
+            let path = concat(parent, subdir.name);
             let flatSubdirs: [string, Directory][] = Array.from(subdir.flatDirs().entries()).map(pair => {
                 let subdirPath = pair[0];
-                return [parent + sep + subdirPath, pair[1]];
+                return [concat(parent, subdirPath), pair[1]];
             });
             let pairs: [string, Directory][] = [[path, subdir], ...flatSubdirs];
             return pairs;
@@ -44,15 +44,27 @@ export class Directory {
             result.push(rootPair);
         }
         return new Map(result);
+
+        function concat(parent: string, subdir: string): string {
+            return parent.endsWith(sep) ? parent + subdir : parent + sep + subdir;
+        }
     }
 }
+
+const isWin = process.platform === "win32";
 
 class DirHierarchyBuilder {
 
     static newHierarchyBuilder(dirPath: string) {
+        if (isWin) {
+            let path = parse(dirPath);
+            const lcRoot = path.root.toLowerCase();
+            if (lcRoot !== path.root) {
+                dirPath = lcRoot + dirPath.substring(lcRoot.length, dirPath.length);
+            }
+        }
         let first: DirHierarchyBuilder | undefined;
         let parentDir = dirPath;
-
         for (; ;) {
             let path = parse(parentDir);
             let name = path.name + path.ext;
@@ -123,7 +135,7 @@ function collpase(name: string, dir: DirHierarchyBuilder): [string, DirHierarchy
         subdir.name = collapsedSubdirName;
         return [collapsedSubdirName, subdir];
     }
-    
+
     dir.subdirs = collapsedSubdirs;
     return [name, dir];
 }

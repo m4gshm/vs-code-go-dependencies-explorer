@@ -43,7 +43,7 @@ async function execGoCmd(command: string, fileDirs: vscode.Uri[]) {
 }
 
 function getWorkspaceFileDirs() {
-    const workspaceFolders = vscode.workspace.workspaceFolders?.filter(wf => wf.uri.scheme === "file").map(wf => wf.uri);
+    const workspaceFolders = vscode.workspace.workspaceFolders?.filter(wf => wf.uri.scheme === "file").map(wf => wf.uri.fsPath);
     return workspaceFolders || [];
 }
 

@@ -15,10 +15,10 @@ export class GoExec {
         this._goPath = goPath;
     }
 
-    public async getAllDependencyDirs(fileDirs: Uri[]): Promise<string[]> {
+    public async getAllDependencyDirs(fileDirs: string[]): Promise<string[]> {
         return Promise.resolve(fileDirs).then(fileDirs =>
-            Promise.all(fileDirs.map(fd => this.getDependencyDirs(fd.path)
-                .then(dirs => dirs.filter(dir => !dir.startsWith(fd.path)))))
+            Promise.all(fileDirs.map(fd => this.getDependencyDirs(fd)
+                .then(dirs => dirs.filter(dir => !dir.startsWith(fd)))))
                 .then(ww => ww.flatMap(s => s)));
     }
 
