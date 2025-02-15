@@ -31,11 +31,25 @@
     },
     "commands": [
       {
+        "command": "go.dependencies.refresh",
+        "title": "Go Dependencies: Refresh",
+        "description": "Refresh the Go dependencies.",
+        "category": "Explorer",
+        "icon": "$(refresh)"
+      },
+      {
         "command": "go.dependencies.open.in.integrated.terminal",
-        "title": "Open in Integrated Terminal"
+        "title": "Go Dependencies: Open selected in Integrated Terminal"
       }
     ],
     "menus": {
+      "view/title": [
+        {
+          "command": "go.dependencies.refresh",
+          "when": "view == go.dependencies.explorer",
+          "group": "navigation"
+        }
+      ],
       "view/item/context": [
         {
           "when": "view == 'go.dependencies.explorer'",

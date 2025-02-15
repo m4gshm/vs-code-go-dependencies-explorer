@@ -5,8 +5,6 @@ import { Directory } from './dir';
 import { GoExtensionAPI } from './goExtension';
 
 export async function activate(context: vscode.ExtensionContext) {
-    const fileDirs = getWorkspaceFileDirs();
-
     // const goPaths = new Set(await execGoCmd('go.gopath', fileDirs));
     // const goRoots = new Set(await execGoCmd('go.goroot', fileDirs));
     // const goTools = new Set(await execGoCmd('go.locate.tools', fileDirs));
@@ -26,9 +24,7 @@ export async function activate(context: vscode.ExtensionContext) {
         throw Error("Cannot detect 'go' path.");
     }
     const goExec = new GoExec(goPath);
-    const dependencyDirs = await goExec.getAllDependencyDirs(fileDirs);
-    const dirs = Directory.create(dependencyDirs);
-    GoDependenciesTreeProvider.setup(context, dirs);
+    context.subscriptions.push(await GoDependenciesTreeProvider.setup(context, goExec));
 }
 
 export function deactivate() {
@@ -40,10 +36,5 @@ async function execGoCmd(command: string, fileDirs: vscode.Uri[]) {
         const goPath: string = await vscode.commands.executeCommand(command, dir);
         return goPath;
     }));
-}
-
-function getWorkspaceFileDirs() {
-    const workspaceFolders = vscode.workspace.workspaceFolders?.filter(wf => wf.uri.scheme === "file").map(wf => wf.uri.fsPath);
-    return workspaceFolders || [];
 }
 

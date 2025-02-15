@@ -1,30 +1,34 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import { Directory } from './dir';
-import { parse, join } from 'path';
+import path, { parse, join } from 'path';
+import { GoExec } from './go';
+import { log } from 'console';
+
+const GIT_MOD = "git.mod";
 
 export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
-  private readonly roots: Directory[];
-  private readonly flatDirs: Map<string, Directory>;
+  private readonly subscriptions: vscode.Disposable[] = [];
+  private readonly goExec: GoExec
+  private roots: Directory[];
+  private flatDirs: Map<string, Directory>;
   private readonly treeView: vscode.TreeView<vscode.TreeItem>;
   private treeVisible = false;
 
-  static async setup(ctx: vscode.ExtensionContext, dirs: Directory[]) {
-    let flatDirs = new Map((dirs.flatMap(d => [...d.flatDirs().entries()])));
-    const provider = new this(ctx, dirs, flatDirs);
-    return provider;
+  static async setup(ctx: vscode.ExtensionContext, goExec: GoExec) {
+    const { roots, flatDirs } = await getGoDirs(goExec);
+    return new this(ctx, goExec, roots, flatDirs);
   }
 
-  constructor(ctx: vscode.ExtensionContext, dirs: Directory[], flatDirs: Map<string, Directory>) {
+  private constructor(ctx: vscode.ExtensionContext, goExec: GoExec, dirs: Directory[], flatDirs: Map<string, Directory>) {
+    this.goExec = goExec;
     this.roots = dirs;
     this.flatDirs = flatDirs;
-
     this.treeView = vscode.window.createTreeView("go.dependencies.explorer", {
       showCollapseAll: true, treeDataProvider: this,
     });
-    ctx.subscriptions.push(this.treeView);
-
-    ctx.subscriptions.push(this.treeView.onDidChangeSelection(event => {
+    this.subscriptions.push(this.treeView);
+    this.subscriptions.push(this.treeView.onDidChangeSelection(event => {
       const selections = event.selection;
       for (const selection of selections) {
         const fileUri = selection.resourceUri;
@@ -36,7 +40,7 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
       }
     }));
 
-    ctx.subscriptions.push(this.treeView.onDidChangeVisibility(async event => {
+    this.subscriptions.push(this.treeView.onDidChangeVisibility(async event => {
       const visible = event.visible;
       this.treeVisible = visible;
       if (this.treeVisible) {
@@ -44,7 +48,7 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
       }
     }));
 
-    vscode.window.tabGroups.onDidChangeTabs(tabs => {
+    this.subscriptions.push(vscode.window.tabGroups.onDidChangeTabs(tabs => {
       if (this.treeVisible) {
         for (const tab of tabs.opened) {
           this.showFileOfActiveTabInTree(tab);
@@ -53,11 +57,11 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
           this.showFileOfActiveTabInTree(tab);
         }
       }
-    });
+    }));
 
     this.syncActiveTabWithTree();
 
-    vscode.commands.registerCommand("go.dependencies.open.in.integrated.terminal", async item => {
+    this.subscriptions.push(vscode.commands.registerCommand("go.dependencies.open.in.integrated.terminal", async item => {
       if (item instanceof FileItem) {
         const uri = vscode.Uri.file(item.filePath);
         await vscode.commands.executeCommand('openInIntegratedTerminal', uri);
@@ -72,7 +76,26 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
       } else {
         console.warn("unexpected item type: " + item);
       }
+    }));
+    vscode.commands.registerCommand('go.dependencies.refresh', () => {
+      // this.refresh()
     });
+
+    const modWatcher = vscode.workspace.createFileSystemWatcher('**/*.go');
+    this.subscriptions.push(modWatcher);
+    modWatcher.onDidCreate(e => this.updateDirs(e));
+    modWatcher.onDidChange(e => this.updateDirs(e));
+    modWatcher.onDidDelete(e => this.updateDirs(e));
+  }
+
+  private async updateDirs(e: vscode.Uri) {
+    const fsPath = path.parse(e.fsPath);
+    if (fsPath.ext === '.go') {
+      const { roots, flatDirs } = await getGoDirs(this.goExec);
+      this.roots = roots;
+      this.flatDirs = flatDirs;
+      this.refresh();
+    }
   }
 
   private syncActiveTabWithTree() {
@@ -155,8 +178,16 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
     return undefined;
   }
 
-  dispose() {
-    this.treeView?.dispose();
+  private _onDidChangeTreeData: vscode.EventEmitter<undefined> = new vscode.EventEmitter<undefined>();
+  readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
+
+  refresh(): void {
+    this._onDidChangeTreeData.fire(undefined);
+  }
+
+  public dispose() {
+    this._onDidChangeTreeData.dispose();
+    this.subscriptions.forEach(s => s.dispose());
   }
 }
 
@@ -181,3 +212,15 @@ class FileItem extends vscode.TreeItem {
     this.resourceUri = vscode.Uri.file(fillFiilePath);
   }
 }
+
+async function getGoDirs(goExec: GoExec) {
+  const roots = Directory.create(await goExec.getAllDependencyDirs(getWorkspaceFileDirs()));
+  const flatDirs = new Map((roots.flatMap(d => [...d.flatDirs().entries()])));
+  return { roots, flatDirs };
+}
+
+function getWorkspaceFileDirs() {
+  const workspaceFolders = vscode.workspace.workspaceFolders?.filter(wf => wf.uri.scheme === "file").map(wf => wf.uri);
+  return workspaceFolders || [];
+}
+

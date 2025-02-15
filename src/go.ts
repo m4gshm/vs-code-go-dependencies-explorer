@@ -23,20 +23,30 @@ export class GoExec {
     }
 
     public async getDependencyDirs(workDir: WorkDir = undefined) {
-        const strResult = await this.execGo(['list', '-f', '{{.Dir}}', 'all'], workDir);
-        const modules = strResult.split('\n').filter(module => module.length > 0);
-        return modules;
+        const execResult = await this.execGo(['list', '-f', '{{.Dir}}', 'all'], workDir);
+        const err = execResult.err;
+        const out = execResult.out;
+        if ('go: warning: "all" matched no packages' === err) {
+            return [];
+        } else {
+            const modules = out.split('\n').filter(module => module.length > 0);
+            return modules;
+        }
     }
 
     public async getDependencies(workDir: WorkDir) {
-        const strResult = await this.execGo(['list', '-m', '-f', '{{.Path}}', 'all'], workDir);
-        const modules = strResult.split('\n').filter(module => module.length > 0);
+        const execResult = await this.execGo(['list', '-m', '-f', '{{.Path}}', 'all'], workDir);
+        const err = execResult.err;
+        const out = execResult.out;
+        const modules = out.split('\n').filter(module => module.length > 0);
         return modules;
     }
 
     public async getModuleInfo(moduleName: string, workDir: WorkDir) {
-        let strResult = await this.execGo(['list', '-m', '--json', `${moduleName}`], workDir);
-        var rawJson = JSON.parse(strResult);
+        let execResult = await this.execGo(['list', '-m', '--json', `${moduleName}`], workDir);
+        const err = execResult.err;
+        const out = execResult.out;
+        var rawJson = JSON.parse(out);
         return rawJson as ModuleInfo;
     }
 
@@ -45,14 +55,13 @@ export class GoExec {
     }
 
     private async exec(command: string, args: string[], workDir: WorkDir) {
-        let strResult: string;
         const execFile = util.promisify(cp.execFile);
         try {
             const { stdout, stderr } = await execFile(command, args, { cwd: workDir });
-            if (stderr.length > 0) {
-                throw Error(`failed to run "${command} ${args}": stderr:'${stderr}' cwd: ${workDir}`);
-            }
-            strResult = stdout.trim();
+            // if (stderr.length > 0) {
+            //     throw Error(`failed to run "${command} ${args}": stderr:'${stderr}' cwd: ${workDir}`);
+            // }
+            return { out: stdout.trim(), err: stderr.trim() };
         } catch (err) {
             if (typeof err === "string") {
                 throw Error(`failed to run "${command} ${args}": ${err} cwd: ${workDir}`);
@@ -61,7 +70,6 @@ export class GoExec {
             }
             throw err;
         }
-        return strResult;
     }
 }
 
