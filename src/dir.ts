@@ -31,19 +31,18 @@ export class Directory {
 
 export function flat(parent: Directory | undefined, dirs: Directory[]) {
     return new Map(dirs.flatMap(dir => {
-        const parentName = (parent && parent.name !== sep ? parent.name : "");
-        const path = concat(parentName, dir.name);
-        const flatSubdirs: [string, Directory][] = Array.from(flat(dir, dir.subdirs).entries()).map(pair => {
+        const path = concat(dir.parent, dir.name);
+        const flatSubdirs: [string, Directory][] = Array.from(flat(dir, dir.subdirs).entries())/*.map(pair => {
             const subdirPath = pair[0];
-            return [concat(parentName, subdirPath), pair[1]];
-        });
+            return [concat(dir.parent, subdirPath), pair[1]];
+        })*/;
         const pairs: [string, Directory][] = [[path, dir], ...flatSubdirs];
         return pairs;
     }));
 
-    function concat(parent: string, subdir: string): string {
-        if (parent.length === 0) {
-            return subdir.startsWith(sep) ? subdir : sep + subdir;
+    function concat(parent: string | undefined, subdir: string): string {
+        if (!parent) {
+            return subdir;
         } else {
             return parent.endsWith(sep) ? parent + subdir : parent + sep + subdir;
         }
@@ -132,6 +131,7 @@ function collpase(name: string, dir: DirHierarchyBuilder): [string, DirHierarchy
         const [subdirName, subdir] = collapsedSubdirs.entries().next().value!!;
         const collapsedSubdirName = dir.name ? join(dir.name, subdirName) : subdirName;
         subdir.name = collapsedSubdirName;
+        subdir.parentPath = dir.parentPath;
         subdir.root = dir.root;
         return [collapsedSubdirName, subdir];
     }
