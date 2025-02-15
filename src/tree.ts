@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
-import { Directory } from './dir';
+import { Directory, flat } from './dir';
 import path, { parse, join } from 'path';
 import { GoExec } from './go';
 import { log } from 'console';
@@ -9,7 +9,7 @@ const GIT_MOD = "git.mod";
 
 export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
   private readonly subscriptions: vscode.Disposable[] = [];
-  private readonly goExec: GoExec
+  private readonly goExec: GoExec;
   private roots: Directory[];
   private flatDirs: Map<string, Directory>;
   private readonly treeView: vscode.TreeView<vscode.TreeItem>;
@@ -215,12 +215,12 @@ class FileItem extends vscode.TreeItem {
 
 async function getGoDirs(goExec: GoExec) {
   const roots = Directory.create(await goExec.getAllDependencyDirs(getWorkspaceFileDirs()));
-  const flatDirs = new Map((roots.flatMap(d => [...d.flatDirs().entries()])));
+  const flatDirs = flat(undefined, roots);
   return { roots, flatDirs };
 }
 
 function getWorkspaceFileDirs() {
-  const workspaceFolders = vscode.workspace.workspaceFolders?.filter(wf => wf.uri.scheme === "file").map(wf => wf.uri);
+  const workspaceFolders = vscode.workspace.workspaceFolders?.filter(wf => wf.uri.scheme === "file").map(wf => wf.uri.fsPath);
   return workspaceFolders || [];
 }
 

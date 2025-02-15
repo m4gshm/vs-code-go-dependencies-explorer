@@ -1,6 +1,6 @@
 import vscode from 'vscode';
 import * as fs from 'fs';
-import { Directory } from './dir';
+import { Directory, flat } from './dir';
 import { sep, parse } from 'path';
 
 export class GoDependenciesFS implements vscode.FileSystemProvider {
@@ -11,8 +11,8 @@ export class GoDependenciesFS implements vscode.FileSystemProvider {
 
     constructor(dirs: Directory[], listFiles: (path: string) => fs.Dirent[]) {
         this.dirs = dirs;
-        let flat = new Map((dirs.flatMap(d => [...d.flatDirs().entries()])));
-        this.flatDirs = flat;
+        let flatDirs = flat(undefined, dirs);
+        this.flatDirs = flatDirs;
         this.listFiles = listFiles;
     }
 
