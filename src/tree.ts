@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import { Directory, flat } from './dir';
 import path, { parse, join } from 'path';
 import { GoExec } from './go';
+import { getWorkspaceFileDirs } from './vscodeUtils';
 import { log } from 'console';
 
 const GIT_MOD = "git.mod";
@@ -226,8 +227,4 @@ async function getGoDirs(goExec: GoExec) {
   return { roots, flatDirs };
 }
 
-function getWorkspaceFileDirs() {
-  const workspaceFolders = vscode.workspace.workspaceFolders?.filter(wf => wf.uri.scheme === "file").map(wf => wf.uri.fsPath);
-  return workspaceFolders || [];
-}
 

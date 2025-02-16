@@ -23,7 +23,7 @@ export class GoExec {
     }
 
     public async getDependencyDirs(workDir: WorkDir = undefined) {
-        const execResult = await this.execGo(['list', '-f', '{{.Dir}}', '-deps', 'all'], workDir);
+        const execResult = await this.execGo(['list', '-f', '{{.Dir}}', 'all'], workDir);
         const err = execResult.err;
         const out = execResult.out;
         if ('go: warning: "all" matched no packages' === err) {
@@ -42,6 +42,17 @@ export class GoExec {
         return modules;
     }
 
+    public async getEnvJson(workDir: WorkDir = undefined) {
+        const execResult = await this.execGo(['env', '-json'], workDir);
+        const err = execResult.err;
+        const out = execResult.out;
+        if (err.length > 0) {
+            return [err, {}];
+        }
+        const rawJson = JSON.parse(out);
+        return [undefined, rawJson];
+    }
+
     public async getModuleInfo(moduleName: string, workDir: WorkDir) {
         let execResult = await this.execGo(['list', '-m', '--json', `${moduleName}`], workDir);
         const err = execResult.err;
@@ -50,7 +61,7 @@ export class GoExec {
         return rawJson as ModuleInfo;
     }
 
-    private async execGo(args: string[], workDir: WorkDir) {
+    private async execGo(args: string[], workDir: WorkDir = undefined) {
         return await this.exec(this.goPath, args, workDir);
     }
 
