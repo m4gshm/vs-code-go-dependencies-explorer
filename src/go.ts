@@ -23,7 +23,7 @@ export class GoExec {
     }
 
     public async getDependencyDirs(workDir: WorkDir = undefined) {
-        const execResult = await this.execGo(['list', '-f', '{{.Dir}}', 'all'], workDir);
+        const execResult = await this.execGo(['list', '-f', '{{.Dir}}', '-deps', 'all'], workDir);
         const err = execResult.err;
         const out = execResult.out;
         if ('go: warning: "all" matched no packages' === err) {

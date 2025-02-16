@@ -129,19 +129,26 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
     return element;
   }
 
-  getChildren(element?: vscode.TreeItem): Thenable<vscode.TreeItem[]> {
+  async getChildren(element?: vscode.TreeItem): Promise<vscode.TreeItem[]> {
     if (element instanceof GoDirItem) {
-      let dir = element.dir;
-      let dirPath = dir.goPath;
-      let files: vscode.TreeItem[] = dirPath ? fs.readdirSync(dirPath)
-        .filter(fileName => {
-          const filePath = join(dirPath, fileName);
-          const stat = fs.statSync(filePath);
-          const dir = stat.isDirectory();
-          return !dir;
-        })
-        .map(fileName => new FileItem(fileName, dirPath)) : [];
-      let subdirs: vscode.TreeItem[] = dir.subdirs.map(d => new GoDirItem(d));
+      const dir = element.dir;
+      const dirPath = dir.goPath;
+      const dirContent = dirPath ? await vscode.workspace.fs.readDirectory(vscode.Uri.file(dirPath)) : [];
+      const files: vscode.TreeItem[] = dirContent.filter(([_, type]) => {
+        return type !== vscode.FileType.Directory;
+      }).map(([filename, _]) => {
+        return new FileItem(filename, dirPath!!);
+      });
+
+      // const files: vscode.TreeItem[] = dirPath ? fs.readdirSync(dirPath)
+      //   .filter(fileName => {
+      //     const filePath = join(dirPath, fileName);
+      //     const stat = fs.statSync(filePath);
+      //     const dir = stat.isDirectory();
+      //     return !dir;
+      //   })
+      //   .map(fileName => new FileItem(fileName, dirPath)) : [];
+      const subdirs: vscode.TreeItem[] = dir.subdirs.map(d => new GoDirItem(d));
       return Promise.resolve([...subdirs, ...files]);
     } else if (!element) {
       return Promise.resolve(Array.from(this.roots).map(m => new GoDirItem(m)));
@@ -155,7 +162,7 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
       const baseDir = this.flatDirs.get(element.filePath);
       return { id: baseDir } as vscode.TreeItem;
     } else {
-      let id = element.id;
+      const id = element.id;
       if (id) {
         let nextLevelPath = id;
         let dir: Directory | undefined;

@@ -1,6 +1,10 @@
 import { sep, parse, join } from 'path';
 
 export class Directory {
+    public get isGoPackage(): boolean {
+        const goPath = this.goPath;
+        return goPath ? goPath.length > 0 : false;
+    }
     constructor(
         // public readonly root: boolean,
         public readonly name: string,
@@ -27,6 +31,7 @@ export class Directory {
         const collapsedRoots = collapse(roots);
         return Array.from(collapsedRoots.values()).map(d => d.toDirectory());
     }
+
 }
 
 export function flat(parent: Directory | undefined, dirs: Directory[]) {
@@ -90,6 +95,11 @@ class DirHierarchyBuilder {
         }
     }
 
+    public get isGoPackage(): boolean {
+        const goPath = this.goPath;
+        return goPath ? goPath.length > 0 : false;
+    }
+
     constructor(
         public root: boolean,
         public name: string,
@@ -126,8 +136,9 @@ function collpase(name: string, dir: DirHierarchyBuilder): [string, DirHierarchy
     const subdirs = dir.subdirs;
     const collapsedSubdirs = collapse(subdirs);
 
+    const isGoPackage = dir.isGoPackage;
     const single = collapsedSubdirs.size === 1;
-    if (single) {
+    if (!isGoPackage && single) {
         const [subdirName, subdir] = collapsedSubdirs.entries().next().value!!;
         const collapsedSubdirName = dir.name ? join(dir.name, subdirName) : subdirName;
         subdir.name = collapsedSubdirName;
