@@ -6,7 +6,7 @@ export class Directory {
         return goPath ? goPath.length > 0 : false;
     }
     constructor(
-        // public readonly root: boolean,
+        public readonly label: string,
         public readonly name: string,
         public readonly parent: string | undefined,
         public readonly goPath: string | undefined,
@@ -14,10 +14,10 @@ export class Directory {
     ) {
     }
 
-    public static create(dirPaths: string[]) {
+    public static create(dirPaths: string[], expectedRoots: Map<string, string> | undefined = undefined) {
         const roots = new Map<string, DirHierarchyBuilder>();
         for (let dirPath of dirPaths) {
-            let root = DirHierarchyBuilder.newHierarchyBuilder(dirPath);
+            let root = DirHierarchyBuilder.newHierarchyBuilder(dirPath, expectedRoots);
             if (root) {
                 let existsRoot = roots.get(root.name);
                 if (existsRoot) {
@@ -27,8 +27,7 @@ export class Directory {
                 }
             }
         }
-
-        const collapsedRoots = collapse(roots);
+        const collapsedRoots = collapse(roots, expectedRoots);
         return Array.from(collapsedRoots.values()).map(d => d.toDirectory());
     }
 
@@ -58,9 +57,9 @@ const isWin = process.platform === "win32";
 
 class DirHierarchyBuilder {
 
-    static newHierarchyBuilder(dirPath: string) {
+    static newHierarchyBuilder(dirPath: string, expectedRoots: Map<string, string> | undefined) {
         if (isWin) {
-            let path = parse(dirPath);
+            const path = parse(dirPath);
             const lcRoot = path.root.toLowerCase();
             if (lcRoot !== path.root) {
                 dirPath = lcRoot + dirPath.substring(lcRoot.length, dirPath.length);
@@ -69,30 +68,38 @@ class DirHierarchyBuilder {
         let first: DirHierarchyBuilder | undefined;
         let parentDir = dirPath;
         for (; ;) {
-            let path = parse(parentDir);
-            let name = path.name + path.ext;
+            if (dirPath.includes('m4gshm')) {
+                console.log(131);
+            }
+            const rootName = expectedRoots?.get(parentDir);
+            const path = parse(parentDir);
+            const name = path.name + path.ext;
             if (name.length === 0) {
                 break;
             }
             if (!first) {
-                first = new DirHierarchyBuilder(true, name, path.dir, dirPath, new Map());
+                first = new DirHierarchyBuilder(true, rootName ? rootName : name, name, path.dir, dirPath, new Map());
             } else {
-                let newRoot = new DirHierarchyBuilder(true, name, path.dir, undefined, new Map());
+                const newRoot = new DirHierarchyBuilder(true, rootName ? rootName : name, name, path.dir, undefined, new Map());
                 newRoot.subdirs.set(first.name!!, first);
                 first.root = false;
                 first = newRoot;
             }
+            if (rootName) {
+                break;
+            }
             parentDir = path.dir;
         }
 
-        if (first && first.name?.length && first.name?.length > 0) {
-            let root = new DirHierarchyBuilder(true, first.parentPath || "", undefined, undefined, new Map());
-            first.root = false;
-            root.subdirs.set(first.name, first);
-            return root;
-        } else {
-            return first;
-        }
+        // if (first && first.name?.length && first.name?.length > 0) {
+        //     let root = new DirHierarchyBuilder(true, first.parentPath || "", undefined, undefined, new Map());
+        //     first.root = false;
+        //     root.subdirs.set(first.name, first);
+        //     return root;
+        // } else {
+        //     return first;
+        // }
+        return first;
     }
 
     public get isGoPackage(): boolean {
@@ -102,6 +109,7 @@ class DirHierarchyBuilder {
 
     constructor(
         public root: boolean,
+        public label: string,
         public name: string,
         public parentPath: string | undefined,
         public goPath: string | undefined,
@@ -121,24 +129,25 @@ class DirHierarchyBuilder {
     }
 
     public toDirectory(): Directory {
-        return new Directory(this.name!!, this.parentPath, this.goPath, Array.from(this.subdirs.values()).map(d => d.toDirectory()));
+        return new Directory(this.label, this.name, this.parentPath, this.goPath, Array.from(this.subdirs.values()).map(d => d.toDirectory()));
     }
 }
 
-function collapse(roots: Map<string, DirHierarchyBuilder>) {
+function collapse(roots: Map<string, DirHierarchyBuilder>, expectedRoots: Map<string, string> | undefined) {
     return new Map(Array.from(roots.entries()).map((pair: [string, DirHierarchyBuilder]) => {
         const [fullPath, dir] = pair;
-        return collpase(fullPath, dir);
+        return collpase(fullPath, dir, expectedRoots);
     }));
 }
 
-function collpase(name: string, dir: DirHierarchyBuilder): [string, DirHierarchyBuilder] {
+function collpase(name: string, dir: DirHierarchyBuilder, expectedRoots: Map<string, string> | undefined): [string, DirHierarchyBuilder] {
     const subdirs = dir.subdirs;
-    const collapsedSubdirs = collapse(subdirs);
+    const collapsedSubdirs = collapse(subdirs, expectedRoots);
 
+    const root = dir.root;
     const isGoPackage = dir.isGoPackage;
     const single = collapsedSubdirs.size === 1;
-    if (!isGoPackage && single) {
+    if (!root && !isGoPackage && single) {
         const [subdirName, subdir] = collapsedSubdirs.entries().next().value!!;
         const collapsedSubdirName = dir.name ? join(dir.name, subdirName) : subdirName;
         subdir.name = collapsedSubdirName;

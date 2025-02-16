@@ -32,14 +32,14 @@
     "commands": [
       {
         "command": "go.dependencies.refresh",
-        "title": "Go Dependencies: Refresh",
-        "description": "Refresh the Go dependencies.",
+        "title": "Refresh",
+        "description": "Refresh the Go Dependencies.",
         "category": "Explorer",
         "icon": "$(refresh)"
       },
       {
         "command": "go.dependencies.open.in.integrated.terminal",
-        "title": "Go Dependencies: Open selected in Integrated Terminal"
+        "title": " Open selected in Integrated Terminal"
       }
     ],
     "menus": {

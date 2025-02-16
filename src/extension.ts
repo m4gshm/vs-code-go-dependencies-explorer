@@ -24,11 +24,11 @@ export async function activate(context: vscode.ExtensionContext) {
         throw Error("Cannot detect 'go' path.");
     }
     const goExec = new GoExec(goPath);
-    context.subscriptions.push(await GoDependenciesTreeProvider.setup(context, goExec));
+    context.subscriptions.push(await GoDependenciesTreeProvider.setup(goExec));
 }
 
 export function deactivate() {
-    console.log('go dependencies tree deactivated');
+    console.log('Go Dependencies deactivated');
 }
 
 async function execGoCmd(command: string, fileDirs: vscode.Uri[]) {

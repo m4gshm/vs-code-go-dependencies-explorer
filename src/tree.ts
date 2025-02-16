@@ -10,21 +10,21 @@ const GIT_MOD = "git.mod";
 
 export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
   private readonly subscriptions: vscode.Disposable[] = [];
+  private readonly treeView: vscode.TreeView<vscode.TreeItem>;
   private readonly goExec: GoExec;
   private roots: Directory[];
-  private flatDirs: Map<string, Directory>;
-  private readonly treeView: vscode.TreeView<vscode.TreeItem>;
+  private dirItems: Map<string, GoDirItem>;
   private treeVisible = false;
 
-  static async setup(ctx: vscode.ExtensionContext, goExec: GoExec) {
+  static async setup(goExec: GoExec) {
     const { roots, flatDirs } = await getGoDirs(goExec);
-    return new this(ctx, goExec, roots, flatDirs);
+    return new this(goExec, roots, flatDirs);
   }
 
-  private constructor(ctx: vscode.ExtensionContext, goExec: GoExec, dirs: Directory[], flatDirs: Map<string, Directory>) {
+  private constructor(goExec: GoExec, roots: Directory[], flatDirs: Map<string, Directory>) {
     this.goExec = goExec;
-    this.roots = dirs;
-    this.flatDirs = flatDirs;
+    this.roots = roots;
+    this.dirItems = new Map(Array.from(flatDirs.entries()).map(([k, v], _) => [k, new GoDirItem(v)]));
     this.treeView = vscode.window.createTreeView("go.dependencies.explorer", {
       showCollapseAll: true, treeDataProvider: this,
     });
@@ -52,15 +52,13 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
     this.subscriptions.push(vscode.window.tabGroups.onDidChangeTabs(tabs => {
       if (this.treeVisible) {
         for (const tab of tabs.opened) {
-          this.showFileOfActiveTabInTree(tab);
+          this.selectFileOfActiveTabInTree(tab);
         }
         for (const tab of tabs.changed) {
-          this.showFileOfActiveTabInTree(tab);
+          this.selectFileOfActiveTabInTree(tab);
         }
       }
     }));
-
-    this.syncActiveTabWithTree();
 
     this.subscriptions.push(vscode.commands.registerCommand("go.dependencies.open.in.integrated.terminal", async item => {
       if (item instanceof FileItem) {
@@ -79,7 +77,7 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
       }
     }));
     vscode.commands.registerCommand('go.dependencies.refresh', () => {
-      // this.refresh()
+      this.refresh();
     });
 
     const modWatcher = vscode.workspace.createFileSystemWatcher('**/*.go');
@@ -94,7 +92,6 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
     if (fsPath.ext === '.go') {
       const { roots, flatDirs } = await getGoDirs(this.goExec);
       this.roots = roots;
-      this.flatDirs = flatDirs;
       this.refresh();
     }
   }
@@ -102,11 +99,11 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
   private syncActiveTabWithTree() {
     const activeTab = vscode.window.tabGroups.activeTabGroup.activeTab;
     if (activeTab) {
-      this.showFileOfActiveTabInTree(activeTab);
+      this.selectFileOfActiveTabInTree(activeTab);
     }
   }
 
-  private showFileOfActiveTabInTree(tab: vscode.Tab) {
+  private selectFileOfActiveTabInTree(tab: vscode.Tab) {
     if (tab.isActive) {
       const input = tab.input;
       const textInput = input instanceof vscode.TabInputText ? input as vscode.TabInputText : undefined;
@@ -114,7 +111,7 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
         const fsPath = textInput.uri.fsPath;
         const filePath = parse(fsPath);
         const dir = filePath.dir;
-        if (this.flatDirs.get(dir)) {
+        if (this.dirItems.get(dir)) {
           vscode.commands.executeCommand("workbench.action.files.setActiveEditorReadonlyInSession");
           this.treeView?.reveal({
             id: fsPath,
@@ -132,6 +129,10 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
 
   async getChildren(element?: vscode.TreeItem): Promise<vscode.TreeItem[]> {
     if (element instanceof GoDirItem) {
+      let children = element.children;
+      if (children) {
+        return Promise.resolve(children);
+      }
       const dir = element.dir;
       const dirPath = dir.goPath;
       const dirContent = dirPath ? await vscode.workspace.fs.readDirectory(vscode.Uri.file(dirPath)) : [];
@@ -140,17 +141,10 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
       }).map(([filename, _]) => {
         return new FileItem(filename, dirPath!!);
       });
-
-      // const files: vscode.TreeItem[] = dirPath ? fs.readdirSync(dirPath)
-      //   .filter(fileName => {
-      //     const filePath = join(dirPath, fileName);
-      //     const stat = fs.statSync(filePath);
-      //     const dir = stat.isDirectory();
-      //     return !dir;
-      //   })
-      //   .map(fileName => new FileItem(fileName, dirPath)) : [];
       const subdirs: vscode.TreeItem[] = dir.subdirs.map(d => new GoDirItem(d));
-      return Promise.resolve([...subdirs, ...files]);
+      children = [...subdirs, ...files];
+      element.children = children;
+      return Promise.resolve(children);
     } else if (!element) {
       return Promise.resolve(Array.from(this.roots).map(m => new GoDirItem(m)));
     } else {
@@ -159,28 +153,26 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
   }
 
   getParent(element: vscode.TreeItem): vscode.TreeItem | undefined {
-    if (element instanceof FileItem) {
-      const baseDir = this.flatDirs.get(element.filePath);
-      return { id: baseDir } as vscode.TreeItem;
-    } else {
-      const id = element.id;
-      if (id) {
-        let nextLevelPath = id;
-        let dir: Directory | undefined;
-        while (!dir) {
-          const path = parse(nextLevelPath);
-          const isRoot = path.root === path.dir && path.base.length === 0;
-          if (isRoot) {
-            break;
-          }
-
-          nextLevelPath = path.dir;
-          dir = this.flatDirs.get(nextLevelPath);
+    const id = element.id;
+    if (id) {
+      let nextLevelPath = id;
+      // let dir: Directory | undefined;
+      let treeItemDir: GoDirItem | undefined;
+      // while (!dir) {
+      while (!treeItemDir) {
+        const path = parse(nextLevelPath);
+        const isRoot = path.root === path.dir && path.base.length === 0;
+        if (isRoot) {
+          break;
         }
-        if (dir) {
-          const baseDir = dir.parent ? join(dir.parent, dir.name) : dir.name;
-          return { id: baseDir } as vscode.TreeItem;
-        }
+        nextLevelPath = path.dir;
+        // dir = this.flatDirs.get(nextLevelPath);
+        treeItemDir = this.dirItems.get(nextLevelPath);
+      }
+      if (treeItemDir) {
+        return treeItemDir;
+        // const baseDir = dir.parent ? join(dir.parent, dir.name) : dir.name;
+        // return { id: baseDir } as vscode.TreeItem;
       }
     }
     return undefined;
@@ -202,9 +194,12 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
 class GoDirItem extends vscode.TreeItem {
   constructor(
     public readonly dir: Directory,
+    public children: vscode.TreeItem[] | undefined = undefined
   ) {
-    super(dir.name, vscode.TreeItemCollapsibleState.Collapsed);
-    this.id = dir.parent ? join(dir.parent, dir.name) : dir.name;
+    super(dir.label, vscode.TreeItemCollapsibleState.Collapsed);
+    const fullPath = dir.parent ? join(dir.parent, dir.name) : dir.name;
+    this.id = fullPath;
+    this.tooltip = fullPath;
     this.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
   }
 }
@@ -222,7 +217,16 @@ class FileItem extends vscode.TreeItem {
 }
 
 async function getGoDirs(goExec: GoExec) {
-  const roots = Directory.create(await goExec.getAllDependencyDirs(getWorkspaceFileDirs()));
+  const env = await goExec.getEnv();
+
+  const goRoot = env['GOROOT'];
+  const goModCache = env['GOMODCACHE'];
+
+  const root = new Map([
+    [`${goRoot}` + path.sep + 'src', 'Standard library'],
+    [`${goModCache}`, 'External packages'],
+  ]);
+  const roots = Directory.create(await goExec.getAllDependencyDirs(getWorkspaceFileDirs()), root);
   const flatDirs = flat(undefined, roots);
   return { roots, flatDirs };
 }

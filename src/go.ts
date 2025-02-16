@@ -15,7 +15,7 @@ export class GoExec {
         this._goPath = goPath;
     }
 
-    public async getAllDependencyDirs(fileDirs: string[]): Promise<string[]> {
+    public async getAllDependencyDirs(fileDirs: string[]) {
         return Promise.resolve(fileDirs).then(fileDirs =>
             Promise.all(fileDirs.map(fd => this.getDependencyDirs(fd)
                 .then(dirs => dirs.filter(dir => !dir.startsWith(fd)))))
@@ -23,34 +23,29 @@ export class GoExec {
     }
 
     public async getDependencyDirs(workDir: WorkDir = undefined) {
-        const execResult = await this.execGo(['list', '-f', '{{.Dir}}', 'all'], workDir);
-        const err = execResult.err;
-        const out = execResult.out;
+        const cmd = ['list', '-f', '{{.Dir}}', 'all'];
+        const result = await this.execGo(cmd, workDir);
+        const err = result.err;
         if ('go: warning: "all" matched no packages' === err) {
             return [];
-        } else {
-            const modules = out.split('\n').filter(module => module.length > 0);
-            return modules;
+        } else if (err.length > 0) {
+            throw this.newError(cmd, err);
         }
+        const out = result.out;
+        const dir = out.split('\n').filter(dir => dir.length > 0);
+        return dir;
     }
 
-    public async getDependencies(workDir: WorkDir) {
-        const execResult = await this.execGo(['list', '-m', '-f', '{{.Path}}', 'all'], workDir);
-        const err = execResult.err;
-        const out = execResult.out;
-        const modules = out.split('\n').filter(module => module.length > 0);
-        return modules;
-    }
-
-    public async getEnvJson(workDir: WorkDir = undefined) {
-        const execResult = await this.execGo(['env', '-json'], workDir);
-        const err = execResult.err;
-        const out = execResult.out;
+    public async getEnv(workDir: WorkDir = undefined) {
+        const cmd = ['env', '-json'];
+        const result = await this.execGo(cmd, workDir);
+        const err = result.err;
         if (err.length > 0) {
-            return [err, {}];
+            throw this.newError(cmd, err);
         }
+        const out = result.out;
         const rawJson = JSON.parse(out);
-        return [undefined, rawJson];
+        return rawJson;
     }
 
     public async getModuleInfo(moduleName: string, workDir: WorkDir) {
@@ -81,6 +76,10 @@ export class GoExec {
             }
             throw err;
         }
+    }
+
+    private newError(cmd: string[], err: string) {
+        return new Error("error on call 'go " + cmd.join(' ') + "': " + err);
     }
 }
 
