@@ -4,6 +4,7 @@ import { Directory, flat } from './dir';
 import path, { parse, join } from 'path';
 import { GoExec } from './go';
 import { getWorkspaceFileDirs } from './vscodeUtils';
+import { SCHEME } from './readonlyFs';
 import { log } from 'console';
 
 const GIT_MOD = "git.mod";
@@ -12,29 +13,32 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
   private readonly subscriptions: vscode.Disposable[] = [];
   private readonly treeView: vscode.TreeView<vscode.TreeItem>;
   private readonly goExec: GoExec;
+  private readonly filesystemScheme: string;
   private roots: Directory[];
   private dirItems: Map<string, GoDirItem>;
   private treeVisible = false;
 
-  static async setup(goExec: GoExec) {
+  static async setup(goExec: GoExec, filesystemScheme: string) {
     const { roots, flatDirs } = await getGoDirs(goExec);
-    return new this(goExec, roots, flatDirs);
+    return new this(goExec, filesystemScheme, roots, flatDirs);
   }
 
-  private constructor(goExec: GoExec, roots: Directory[], flatDirs: Map<string, Directory>) {
+  private constructor(goExec: GoExec, filesystemScheme: string, roots: Directory[], flatDirs: Map<string, Directory>) {
     this.goExec = goExec;
     this.roots = roots;
+    this.filesystemScheme = filesystemScheme;
     this.dirItems = new Map(Array.from(flatDirs.entries()).map(([k, v], _) => [k, new GoDirItem(v)]));
     this.treeView = vscode.window.createTreeView("go.dependencies.explorer", {
       showCollapseAll: true, treeDataProvider: this,
     });
     this.subscriptions.push(this.treeView);
-    this.subscriptions.push(this.treeView.onDidChangeSelection(event => {
+    this.subscriptions.push(this.treeView.onDidChangeSelection(async event => {
       const selections = event.selection;
       for (const selection of selections) {
         const fileUri = selection.resourceUri;
         if (fileUri) {
-          vscode.workspace.openTextDocument(fileUri).then(
+          const newUri = replaceUriScheme(fileUri, 'file');
+          await vscode.workspace.openTextDocument(newUri).then(
             document => vscode.window.showTextDocument(document)
           );
         }
@@ -139,7 +143,7 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
       const files: vscode.TreeItem[] = dirContent.filter(([_, type]) => {
         return type !== vscode.FileType.Directory;
       }).map(([filename, _]) => {
-        return new FileItem(filename, dirPath!!);
+        return new FileItem(filename, dirPath!!, this.filesystemScheme);
       });
       const subdirs: vscode.TreeItem[] = dir.subdirs.map(d => new GoDirItem(d));
       children = [...subdirs, ...files];
@@ -156,9 +160,7 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
     const id = element.id;
     if (id) {
       let nextLevelPath = id;
-      // let dir: Directory | undefined;
       let treeItemDir: GoDirItem | undefined;
-      // while (!dir) {
       while (!treeItemDir) {
         const path = parse(nextLevelPath);
         const isRoot = path.root === path.dir && path.base.length === 0;
@@ -166,13 +168,10 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
           break;
         }
         nextLevelPath = path.dir;
-        // dir = this.flatDirs.get(nextLevelPath);
         treeItemDir = this.dirItems.get(nextLevelPath);
       }
       if (treeItemDir) {
         return treeItemDir;
-        // const baseDir = dir.parent ? join(dir.parent, dir.name) : dir.name;
-        // return { id: baseDir } as vscode.TreeItem;
       }
     }
     return undefined;
@@ -208,12 +207,28 @@ class FileItem extends vscode.TreeItem {
   constructor(
     public readonly fileName: string,
     public readonly filePath: string,
+    public readonly filesystemScheme: string | undefined = undefined,
   ) {
     super(fileName);
-    const fillFiilePath = join(filePath, fileName);
-    this.id = fillFiilePath;
-    this.resourceUri = vscode.Uri.file(fillFiilePath);
+    const fillFilePath = join(filePath, fileName);
+    let uri = vscode.Uri.file(fillFilePath);
+    uri = replaceUriScheme(uri, filesystemScheme);
+    this.id = fillFilePath;
+    this.resourceUri = uri;
   }
+}
+
+function replaceUriScheme(uri: vscode.Uri, newScheme: string | undefined) {
+  if (newScheme && uri.scheme !== newScheme) {
+    return vscode.Uri.from({
+      scheme: newScheme,
+      authority: uri.authority,
+      path: uri.path,
+      query: uri.query,
+      fragment: uri.fragment,
+    });
+  }
+  return uri;
 }
 
 async function getGoDirs(goExec: GoExec) {

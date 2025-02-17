@@ -1,14 +1,11 @@
 import * as vscode from 'vscode';
 import { GoDependenciesTreeProvider } from "./tree";
 import { GoExec } from './go';
-import { Directory } from './dir';
 import { GoExtensionAPI } from './goExtension';
+import { ReadonlyFileSystemProvider, SCHEME } from './readonlyFs';
+
 
 export async function activate(context: vscode.ExtensionContext) {
-    // const goPaths = new Set(await execGoCmd('go.gopath', fileDirs));
-    // const goRoots = new Set(await execGoCmd('go.goroot', fileDirs));
-    // const goTools = new Set(await execGoCmd('go.locate.tools', fileDirs));
-
     const goExtension = vscode.extensions.getExtension('golang.go');
     if (!goExtension) {
         throw Error("'golang.go' is not installed.");
@@ -23,8 +20,11 @@ export async function activate(context: vscode.ExtensionContext) {
     if (!goPath) {
         throw Error("Cannot detect 'go' path.");
     }
+    context.subscriptions.push(vscode.workspace.registerFileSystemProvider(SCHEME, 
+        new ReadonlyFileSystemProvider(vscode.workspace.fs), { isReadonly: true }));
+
     const goExec = new GoExec(goPath);
-    context.subscriptions.push(await GoDependenciesTreeProvider.setup(goExec));
+    context.subscriptions.push(await GoDependenciesTreeProvider.setup(goExec, SCHEME));
 }
 
 export function deactivate() {
