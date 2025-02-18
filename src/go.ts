@@ -23,7 +23,7 @@ export class GoExec {
     }
 
     public async getDependencyDirs(workDir: WorkDir = undefined) {
-        const cmd = ['list', '-f', '{{.Dir}}', 'all'];
+        const cmd = ['list', '-f', '{{.Dir}}', '-e', 'all'];
         const result = await this.execGo(cmd, workDir);
         const err = result.err;
         if ('go: warning: "all" matched no packages' === err) {
@@ -64,22 +64,17 @@ export class GoExec {
         const execFile = util.promisify(cp.execFile);
         try {
             const { stdout, stderr } = await execFile(command, args, { cwd: workDir });
-            // if (stderr.length > 0) {
-            //     throw Error(`failed to run "${command} ${args}": stderr:'${stderr}' cwd: ${workDir}`);
-            // }
             return { out: stdout.trim(), err: stderr.trim() };
         } catch (err) {
             if (typeof err === "string") {
-                throw Error(`failed to run "${command} ${args}": ${err} cwd: ${workDir}`);
-            } else if (err instanceof Error) {
-                throw Error(`failed to run "${command} ${args}": ${err.message} cwd: ${workDir}`);
+                throw this.newError(args, err);
             }
             throw err;
         }
     }
 
-    private newError(cmd: string[], err: string) {
-        return new Error("error on call 'go " + cmd.join(' ') + "': " + err);
+    private newError(args: string[], err: string) {
+        return new Error("failed to run 'go " + args.join(' ') + "': " + err);
     }
 }
 

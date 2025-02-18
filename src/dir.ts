@@ -36,10 +36,7 @@ export class Directory {
 export function flat(parent: Directory | undefined, dirs: Directory[]) {
     return new Map(dirs.flatMap(dir => {
         const path = concat(dir.parent, dir.name);
-        const flatSubdirs: [string, Directory][] = Array.from(flat(dir, dir.subdirs).entries())/*.map(pair => {
-            const subdirPath = pair[0];
-            return [concat(dir.parent, subdirPath), pair[1]];
-        })*/;
+        const flatSubdirs: [string, Directory][] = Array.from(flat(dir, dir.subdirs).entries());
         const pairs: [string, Directory][] = [[path, dir], ...flatSubdirs];
         return pairs;
     }));

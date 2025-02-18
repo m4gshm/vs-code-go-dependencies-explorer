@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { GoDependenciesTreeProvider } from "./tree";
+import { GoDependenciesTreeProvider } from "./dependenciesTree";
 import { GoExec } from './go';
 import { GoExtensionAPI } from './goExtension';
 import { ReadonlyFileSystemProvider, SCHEME } from './readonlyFs';
@@ -22,9 +22,7 @@ export async function activate(context: vscode.ExtensionContext) {
     }
     context.subscriptions.push(vscode.workspace.registerFileSystemProvider(SCHEME, 
         new ReadonlyFileSystemProvider(vscode.workspace.fs), { isReadonly: true }));
-
-    const goExec = new GoExec(goPath);
-    context.subscriptions.push(await GoDependenciesTreeProvider.setup(goExec, SCHEME));
+    context.subscriptions.push(await GoDependenciesTreeProvider.setup(new GoExec(goPath), SCHEME));
 }
 
 export function deactivate() {
