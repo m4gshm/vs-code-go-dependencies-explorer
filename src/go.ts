@@ -15,24 +15,26 @@ export class GoExec {
         this._goPath = goPath;
     }
 
-    public async getAllDependencyDirs(fileDirs: string[]) {
-        return Promise.resolve(fileDirs).then(fileDirs =>
-            Promise.all(fileDirs.map(fd => this.getDependencyDirs(fd)
-                .then(dirs => dirs.filter(dir => !dir.startsWith(fd)))))
+    public async listAllPackageDirs(workDirs: string[]) {
+        return Promise.resolve(workDirs).then(fileDirs =>
+            Promise.all(fileDirs.map(fd => this.listPackageDirs(fd, true)))
                 .then(ww => ww.flatMap(s => s)));
     }
 
-    public async getDependencyDirs(workDir: WorkDir = undefined) {
-        const cmd = ['list', '-f', '{{.Dir}}', '-e', 'all'];
-        const result = await this.execGo(cmd, workDir);
+    public async listPackageDirs(workDir: string | undefined = undefined, excludeWorkDir = true) {
+        const args = ['list', '-f', '{{.Dir}}', '-e', 'all'];
+        const result = await this.execGo(args, workDir);
         const err = result.err;
         if ('go: warning: "all" matched no packages' === err) {
             return [];
         } else if (err.length > 0) {
-            throw this.newError(cmd, err);
+            throw this.newError(args, err);
         }
         const out = result.out;
         const dir = out.split('\n').filter(dir => dir.length > 0);
+        if (workDir && excludeWorkDir) {
+            return dir.filter(dir => !dir.startsWith(workDir));
+        }
         return dir;
     }
 
@@ -48,12 +50,22 @@ export class GoExec {
         return rawJson;
     }
 
-    public async getModuleInfo(moduleName: string, workDir: WorkDir) {
-        let execResult = await this.execGo(['list', '-m', '--json', `${moduleName}`], workDir);
-        const err = execResult.err;
-        const out = execResult.out;
-        var rawJson = JSON.parse(out);
-        return rawJson as ModuleInfo;
+    public async getModuleDir(moduleName: string | undefined = undefined, workDir: string, excludeWorkDir = true) {
+        const args = ['list', '-f', '{{.Dir}}', '-m', '-e'];
+        if (moduleName) {
+            args.push(moduleName);
+        }
+        const result = await this.execGo(args, workDir);
+        const err = result.err;
+        if (err.length > 0) {
+            throw this.newError(args, err);
+        }
+        const out = result.out;
+        const dir = out.split('\n').filter(dir => dir.length > 0);
+        if (workDir && excludeWorkDir) {
+            return dir.filter(dir => !dir.startsWith(workDir));
+        }
+        return dir;
     }
 
     private async execGo(args: string[], workDir: WorkDir = undefined) {
@@ -75,16 +87,5 @@ export class GoExec {
 
     private newError(args: string[], err: string) {
         return new Error("failed to run 'go " + args.join(' ') + "': " + err);
-    }
-}
-
-export class ModuleInfo {
-    constructor(
-        public readonly Path: string,
-        public readonly Main: boolean,
-        public readonly Dir: string,
-        public readonly GoMod: string,
-        public readonly GoVersion: string,
-    ) {
     }
 }

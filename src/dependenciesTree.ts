@@ -1,31 +1,40 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
+import wu from 'wu';
 import { Directory, flat } from './dir';
 import path, { parse, join } from 'path';
 import { GoExec } from './go';
 import { getWorkspaceFileDirs } from './vscodeUtils';
-import { SCHEME } from './readonlyFs';
-import { log } from 'console';
+import { promisify } from 'util';
 
-const GIT_MOD = "git.mod";
+export const GO_MOD_PATTERN = '**/go.mod';
+export const GO_SUM_PATTERN = '**/go.sum';
 
 export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
   private readonly subscriptions: vscode.Disposable[] = [];
+  // private readonly watchers: fs.FSWatcher[];
   private readonly treeView: vscode.TreeView<vscode.TreeItem>;
-  private readonly goExec: GoExec;
   private readonly filesystemScheme: string;
-  private roots: Directory[] = [];
-  private dirItems: Map<string, GoDirItem> = new Map();
+  private readonly goExec: GoExec;
+
   private treeVisible = false;
 
+  private readonly stdLibDirs: Map<string, GoDirItem>;
+  private readonly stdLibRootDir: GoDirItem;
+  private modulesRootDir: GoDirItem | undefined;
+  private modulesDirs: Map<string, GoDirItem> = new Map();
+
   static async setup(goExec: GoExec, filesystemScheme: string) {
-    const { roots, flatDirs } = await getGoDirs(goExec);
-    return new this(goExec, filesystemScheme, roots, flatDirs);
+    const std = await getGoStdLibPackageDirs(goExec);
+    const modules = await getGoModulesPackageDirs(goExec);
+    return new this(goExec, filesystemScheme, std, modules);
   }
 
-  private constructor(goExec: GoExec, filesystemScheme: string, roots: Directory[], flatDirs: Map<string, Directory>) {
+  private constructor(goExec: GoExec, filesystemScheme: string, std: GoPackageDirs, modules: GoPackageDirs) {
     this.goExec = goExec;
-    this.initDirs(roots, flatDirs);
+    this.stdLibRootDir = newGoDirItem(std.root);
+    this.stdLibDirs = convertToGoDirs(std.flatDirs);
+    this.initModulesDir(modules);
     this.filesystemScheme = filesystemScheme;
     this.treeView = vscode.window.createTreeView("go.dependencies.explorer", {
       showCollapseAll: true, treeDataProvider: this,
@@ -83,28 +92,45 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
       await this.refresh();
     });
 
-    this.watchChanges('**/*.go');
-    this.watchChanges('go.{mod,sum}');
+    this.watchChanges();
+
+    // const workspaceDirs = getWorkspaceFileDirs();
+    // this.watchers = workspaceDirs.map(dir => {
+    //   const watcher = fs.watch(dir, { recursive: true }, (vent, filename) => {
+    //     console.debug(`watch file: ${filename}, ${vent}`);
+    //     if (vent === 'change' && filename) {
+    //       const path = parse(join(dir, filename));
+    //       if (path.ext === 'go' || ((path.ext === 'mod' || path.ext === 'sum') && path.name === 'go')) {
+    //         console.debug(`refresh tree by changed file ${filename}`);
+    //         this.refresh();
+    //       }
+    //     }
+    //   });
+    //   return watcher;
+    // });
   }
 
-  private watchChanges(filePattern: string) {
+  private watchChanges() {
+    const filePattern = '**/go.{mod,sum}';
     const gofileWatcher = vscode.workspace.createFileSystemWatcher(filePattern);
     this.subscriptions.push(gofileWatcher);
-    gofileWatcher.onDidCreate(e => this.updateDirs(filePattern, e));
-    gofileWatcher.onDidChange(e => this.updateDirs(filePattern, e));
-    gofileWatcher.onDidDelete(e => this.updateDirs(filePattern, e));
+    gofileWatcher.onDidCreate(e => this.updateDirs('create', filePattern, e));
+    gofileWatcher.onDidChange(e => this.updateDirs('change', filePattern, e));
+    gofileWatcher.onDidDelete(e => this.updateDirs('delete', filePattern, e));
+    return gofileWatcher;
   }
 
-  private async updateDirs(filePattern: string, event: vscode.Uri) {
-    const fsPath = path.parse(event.fsPath);
-    if (fsPath.ext === '.go' || (fsPath.name === 'go' && (fsPath.ext === 'mod' || fsPath.ext === 'sum'))) {
-      await this.refresh();
-    }
+  private async updateDirs(op: string, filePattern: vscode.GlobPattern, event: vscode.Uri) {
+    console.debug(`updateDirs: ${op}, ${filePattern}, ${event}`);
+    // const fsPath = path.parse(event.fsPath);
+    // if (fsPath.ext === '.go' || (fsPath.name === 'go' && (fsPath.ext === 'mod' || fsPath.ext === 'sum'))) {
+    await this.refresh();
+    // }
   }
 
-  private initDirs(roots: Directory[], flatDirs: Map<string, Directory>) {
-    this.roots = roots;
-    this.dirItems = new Map(Array.from(flatDirs.entries()).map(([k, v], _) => [k, new GoDirItem(v)]));
+  private initModulesDir(modules: GoPackageDirs) {
+    this.modulesRootDir = newGoDirItem(modules.root);
+    this.modulesDirs = convertToGoDirs(modules.flatDirs);
   }
 
   private syncActiveTabWithTree() {
@@ -122,7 +148,7 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
         const fsPath = textInput.uri.fsPath;
         const filePath = parse(fsPath);
         const dir = filePath.dir;
-        if (this.dirItems.get(dir)) {
+        if (this.isPackageDir(dir)) {
           vscode.commands.executeCommand("workbench.action.files.setActiveEditorReadonlyInSession");
           this.treeView?.reveal({
             id: fsPath,
@@ -132,6 +158,10 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
         }
       }
     }
+  }
+
+  private isPackageDir(dir: string): boolean {
+    return this.stdLibDirs.has(dir) || this.modulesDirs.has(dir);
   }
 
   getTreeItem(element: vscode.TreeItem): vscode.TreeItem {
@@ -145,19 +175,25 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
         return Promise.resolve(children);
       }
       const dir = element.dir;
-      const dirPath = dir.goPath;
-      const dirContent = dirPath ? await vscode.workspace.fs.readDirectory(vscode.Uri.file(dirPath)) : [];
+      const p = dir.parent;
+      const dirPath = p ? join(p, dir.name) : dir.name;
+      const dirContent = dir.findFiles ? await vscode.workspace.fs.readDirectory(vscode.Uri.file(dirPath)) : [];
       const files: vscode.TreeItem[] = dirContent.filter(([_, type]) => {
         return type !== vscode.FileType.Directory;
       }).map(([filename, _]) => {
         return new FileItem(filename, dirPath!!, this.filesystemScheme);
       });
-      const subdirs: vscode.TreeItem[] = dir.subdirs.map(d => new GoDirItem(d));
+      const subdirs: vscode.TreeItem[] = dir.subdirs.map(d => newGoDirItem(d));
       children = [...subdirs, ...files];
       element.children = children;
       return Promise.resolve(children);
     } else if (!element) {
-      return Promise.resolve(Array.from(this.roots).map(m => new GoDirItem(m)));
+      const roots = [this.stdLibRootDir];
+      const modules = this.modulesRootDir;
+      if (modules) {
+        roots.push(modules);
+      }
+      return Promise.resolve(roots);
     } else {
       return Promise.resolve([]);
     }
@@ -175,7 +211,7 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
           break;
         }
         nextLevelPath = path.dir;
-        treeItemDir = this.dirItems.get(nextLevelPath);
+        treeItemDir = this.getGoDirItem(nextLevelPath);
       }
       if (treeItemDir) {
         return treeItemDir;
@@ -187,15 +223,19 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
   private _onDidChangeTreeData: vscode.EventEmitter<undefined> = new vscode.EventEmitter<undefined>();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
+  private getGoDirItem(nextLevelPath: string): GoDirItem | undefined {
+    return this.stdLibDirs.get(nextLevelPath) || this.modulesDirs.get(nextLevelPath);
+  }
+
   async refresh() {
-    const goDirs = await getGoDirs(this.goExec);
-    this.initDirs(goDirs.roots, goDirs.flatDirs);
+    this.initModulesDir(await getGoModulesPackageDirs(this.goExec));
     this._onDidChangeTreeData.fire(undefined);
   }
 
   public dispose() {
     this._onDidChangeTreeData.dispose();
     this.subscriptions.forEach(s => s.dispose());
+    // this.watchers.forEach(watcher => watcher.close());
   }
 }
 
@@ -227,6 +267,18 @@ class FileItem extends vscode.TreeItem {
   }
 }
 
+function newGoDirItem(std: Directory): GoDirItem {
+  return new GoDirItem(std);
+}
+
+function convertToGoDirs(flatDirs: Map<string, Directory>): Map<string, GoDirItem> {
+  return new Map(wu(flatDirs.entries()).map(([fullPath, dir]) => [fullPath, newGoDirItem(dir)]));
+}
+
+async function getGoModuleDirs() {
+  return (await vscode.workspace.findFiles(GO_MOD_PATTERN)).map(f => parse(f.fsPath).dir);
+}
+
 function replaceUriScheme(uri: vscode.Uri, newScheme: string | undefined) {
   if (newScheme && uri.scheme !== newScheme) {
     return vscode.Uri.from({
@@ -240,32 +292,86 @@ function replaceUriScheme(uri: vscode.Uri, newScheme: string | undefined) {
   return uri;
 }
 
-async function getGoDirs(goExec: GoExec): Promise<GoDirs> {
+async function getGoStdLibPackageDirs(goExec: GoExec): Promise<GoPackageDirs> {
   const env = await goExec.getEnv();
 
   const goRoot = env['GOROOT'];
+
+  const stdLibDir = join(`${goRoot}`, 'src');
+  console.debug(`retrieving Go package for standart library ${stdLibDir}`);
+
+  const stdGoPackageDirs = await getPackageDirs(stdLibDir);
+
+  const root = Directory.create(stdGoPackageDirs, stdLibDir, 'Standard library');
+  const flatDirs = flat([root]);
+
+  return { root: root, flatDirs: flatDirs };
+}
+
+async function getGoModulesPackageDirs(goExec: GoExec): Promise<GoPackageDirs> {
+  const env = await goExec.getEnv();
+
   const goModCache = env['GOMODCACHE'];
 
-  const root = new Map([
-    [`${goRoot}` + path.sep + 'src', 'Standard library'],
-    [`${goModCache}`, 'External packages'],
-  ]);
-  try {
-    const depDirs = await goExec.getAllDependencyDirs(getWorkspaceFileDirs());
-    const roots = Directory.create(depDirs, root);
-    const flatDirs = flat(undefined, roots);
-    return { roots: roots, flatDirs: flatDirs };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : `${err}`;
-    vscode.window.showErrorMessage(message);
-    return { roots: [], flatDirs: new Map() };
+  const dirs = await getGoModuleDirs();
+  console.debug(`retrieving Go module directories ${dirs}`);
+
+  const moduleDirs = Array.from(new Set((await Promise.all(dirs.map(async dir => {
+    try {
+      const moduleDirs = await goExec.getModuleDir("all", dir);
+      return { baseDir: dir, moduleDirs: moduleDirs, error: undefined };
+    } catch (err) {
+      return { baseDir: dir, moduleDirs: [], error: err };
+    }
+  }))).flatMap(d => d)));
+
+  moduleDirs.filter(md => md.error !== undefined).forEach(md => {
+    const err = md.error;
+    if (err) {
+      const moduelDir = md.baseDir;
+      const message = err instanceof Error ? err.message : `${err}`;
+      const errMessage = `Module error: '${moduelDir}', ${message}`;
+      console.info(errMessage);
+      // vscode.window.showErrorMessage(errMessage);
+    }
+  });
+
+  const allModuleDirs = Array.from(new Set(moduleDirs.flatMap(md => md.moduleDirs)));
+  console.debug(`retrieving Go package dirs for module dirs ${allModuleDirs}`);
+
+  const modulePackageDirs = (await Promise.all(allModuleDirs.map(async d => await getPackageDirs(d)))).flatMap(dd => dd);
+
+  const root = Directory.create(modulePackageDirs, `${goModCache}`, 'External packages');
+  const flatDirs = flat([root]);
+
+  return { root: root, flatDirs: flatDirs };
+}
+
+async function getPackageDirs(dir: string) {
+  return Array.from(new Set(await listGoPackageDirs(dir)));
+}
+
+async function listGoPackageDirs(dirPath: string): Promise<string[]> {
+  const opendir = promisify(fs.opendir);
+  const dir = await opendir(dirPath);
+  const path = dir.path;
+  let isGoPackage = false;
+  let subPackages: string[] = [];
+  for await (let sub of dir) {
+    isGoPackage = isGoPackage || isGoFile(sub);
+    if (sub.isDirectory()) {
+      subPackages.push(...(await listGoPackageDirs(join(sub.parentPath, sub.name))));
+    }
+  }
+  const result = isGoPackage ? [path] : [];
+  return subPackages ? [...result, ...subPackages] : result;
+
+  function isGoFile(d: fs.Dirent) {
+    return d.isFile() && d.name.endsWith('.go');
   }
 }
 
-interface GoDirs {
-  roots: Directory[];
+interface GoPackageDirs {
+  root: Directory;
   flatDirs: Map<string, Directory>;
 }
-
-
-
