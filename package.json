@@ -39,7 +39,19 @@
       },
       {
         "command": "go.dependencies.open.in.integrated.terminal",
-        "title": " Open selected in Integrated Terminal"
+        "title": " Open in Integrated Terminal"
+      },
+      {
+        "command": "go.dependencies.reveal.in.os.mac",
+        "title": " Reveal in Finder"
+      },
+      {
+        "command": "go.dependencies.reveal.in.os.windows",
+        "title": " Reveal in File Explorer"
+      },
+      {
+        "command": "go.dependencies.reveal.in.os.linux",
+        "title": " Reveal in Explorer View"
       }
     ],
     "menus": {
@@ -54,6 +66,18 @@
         {
           "when": "view == 'go.dependencies.explorer'",
           "command": "go.dependencies.open.in.integrated.terminal"
+        },
+        {
+          "when": "view == 'go.dependencies.explorer' && isWindows",
+          "command": "go.dependencies.reveal.in.os.windows"
+        },
+        {
+          "when": "view == 'go.dependencies.explorer' && isMac",
+          "command": "go.dependencies.reveal.in.os.mac"
+        },
+        {
+          "when": "view == 'go.dependencies.explorer' && isLinux",
+          "command": "go.dependencies.reveal.in.os.limux"
         }
       ]
     }

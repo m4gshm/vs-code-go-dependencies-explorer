@@ -72,42 +72,41 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
       }
     }));
 
-    this.subscriptions.push(vscode.commands.registerCommand("go.dependencies.open.in.integrated.terminal", async item => {
-      if (item instanceof FileItem) {
-        const uri = vscode.Uri.file(item.filePath);
-        await vscode.commands.executeCommand('openInIntegratedTerminal', uri);
-      } else if (item instanceof GoDirItem) {
-        const path = item.id;
-        if (path) {
-          const uri = vscode.Uri.file(path);
-          await vscode.commands.executeCommand('openInIntegratedTerminal', uri);
-        } else {
-          console.warn("undefined path of item: " + item);
-        }
-      } else {
-        console.warn("unexpected item type: " + item);
-      }
+    this.subscriptions.push(vscode.commands.registerCommand('go.dependencies.open.in.integrated.terminal', async item => {
+      await execCommandOnItem('openInIntegratedTerminal', item);
     }));
-    vscode.commands.registerCommand('go.dependencies.refresh', async () => {
-      await this.refresh();
+
+    ['mac', 'windows', 'linux'].forEach(os => {
+      this.subscriptions.push(vscode.commands.registerCommand(`go.dependencies.reveal.in.os.${os}`, async item => {
+        await execCommandOnItem('revealFileInOS', item);
+      }));
     });
 
+    vscode.commands.registerCommand('go.dependencies.refresh', async () => await this.refresh());
     this.watchChanges();
 
-    // const workspaceDirs = getWorkspaceFileDirs();
-    // this.watchers = workspaceDirs.map(dir => {
-    //   const watcher = fs.watch(dir, { recursive: true }, (vent, filename) => {
-    //     console.debug(`watch file: ${filename}, ${vent}`);
-    //     if (vent === 'change' && filename) {
-    //       const path = parse(join(dir, filename));
-    //       if (path.ext === 'go' || ((path.ext === 'mod' || path.ext === 'sum') && path.name === 'go')) {
-    //         console.debug(`refresh tree by changed file ${filename}`);
-    //         this.refresh();
-    //       }
-    //     }
-    //   });
-    //   return watcher;
-    // });
+    async function execCommandOnItem(command: string, item: any,) {
+      let uri = getUriOfSelectedItem(item);
+      if (uri) {
+        await vscode.commands.executeCommand(command, uri);
+      }
+      function getUriOfSelectedItem(item: any) {
+        let uri: vscode.Uri | undefined;
+        if (item instanceof FileItem) {
+          uri = vscode.Uri.file(item.filePath);
+        } else if (item instanceof GoDirItem) {
+          const path = item.id;
+          if (path) {
+            uri = vscode.Uri.file(path);
+          } else {
+            console.warn("undefined path of item: " + item);
+          }
+        } else {
+          console.warn("unexpected item type: " + item);
+        }
+        return uri;
+      }
+    }
   }
 
   private watchChanges() {

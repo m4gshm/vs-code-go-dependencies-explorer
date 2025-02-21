@@ -1,8 +1,8 @@
 package main
 
 import _ "runtime"
-// import "fmt"
-// import "github.com/m4gshm/flag/flagenum"
+import "fmt"
+import _ "github.com/m4gshm/flag/flagenum"
 
 
 func main() {
