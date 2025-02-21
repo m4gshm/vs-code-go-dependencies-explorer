@@ -1,30 +1,38 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
-import { GoDependenciesTreeProvider } from "./tree";
-import { getGoConfig } from "./config";
-// import { setGOROOTEnvVar } from "./goEnv";
+import { GoDependenciesTreeProvider } from "./dependenciesTree";
+import { GoExec } from './go';
+import { GoExtensionAPI } from './goExtension';
+import { ReadonlyFileSystemProvider, SCHEME } from './readonlyFs';
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
-export function activate(context: vscode.ExtensionContext) {
 
-	const goroot = process.env['GOROOT'];
-
-	const cfg = getGoConfig();
-	// WelcomePanel.activate(ctx, goCtx);
-
-	const configGOROOT = getGoConfig()['goroot'];
-	// if (configGOROOT) {
-	// 	// We don't support unsetting go.goroot because we don't know whether
-	// 	// !configGOROOT case indicates the user wants to unset process.env['GOROOT']
-	// 	// or the user wants the extension to use the current process.env['GOROOT'] value.
-	// 	// TODO(hyangah): consider utilizing an empty value to indicate unset?
-	// 	setGOROOTEnvVar(configGOROOT);
-	// }
-
-	GoDependenciesTreeProvider.setup(context);
+export async function activate(context: vscode.ExtensionContext) {
+    const goExtension = vscode.extensions.getExtension('golang.go');
+    if (!goExtension) {
+        throw Error("'golang.go' is not installed.");
+    }
+    const isActive = goExtension.isActive;
+    const exports: GoExtensionAPI | undefined = !isActive ? await goExtension.activate() : goExtension.exports;
+    if (!exports) {
+        throw Error("'golang.go' desn't export API.");
+    }
+    const result = exports.settings.getExecutionCommand('go');
+    const goPath = result?.binPath;
+    if (!goPath) {
+        throw Error("Cannot detect 'go' path.");
+    }
+    context.subscriptions.push(vscode.workspace.registerFileSystemProvider(SCHEME, 
+        new ReadonlyFileSystemProvider(vscode.workspace.fs), { isReadonly: true }));
+    context.subscriptions.push(await GoDependenciesTreeProvider.setup(new GoExec(goPath), SCHEME));
 }
 
-// This method is called when your extension is deactivated
-export function deactivate() { }
+export function deactivate() {
+    console.log('Go Dependencies deactivated');
+}
+
+async function execGoCmd(command: string, fileDirs: vscode.Uri[]) {
+    return await Promise.all(fileDirs.map(async (dir) => {
+        const goPath: string = await vscode.commands.executeCommand(command, dir);
+        return goPath;
+    }));
+}
+
