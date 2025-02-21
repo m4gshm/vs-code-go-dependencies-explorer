@@ -1,5 +1,5 @@
 {
-  "name": "vs-code-files-tree",
+  "name": "vs-code-go-dependencies-explorer",
   "displayName": "",
   "description": "",
   "version": "0.0.1",
@@ -22,13 +22,65 @@
     "views": {
       "explorer": [
         {
-          "id": "go.dependencies",
-          "name": "dependencies",
+          "id": "go.dependencies.explorer",
+          "name": "Dependencies",
+          "visibility": "hidden",
           "when": "go.showExplorer"
         }
       ]
     },
-    "commands": []
+    "commands": [
+      {
+        "command": "go.dependencies.refresh",
+        "title": "Refresh",
+        "description": "Refresh the Go Dependencies.",
+        "category": "Explorer",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "go.dependencies.open.in.integrated.terminal",
+        "title": " Open in Integrated Terminal"
+      },
+      {
+        "command": "go.dependencies.reveal.in.os.mac",
+        "title": " Reveal in Finder"
+      },
+      {
+        "command": "go.dependencies.reveal.in.os.windows",
+        "title": " Reveal in File Explorer"
+      },
+      {
+        "command": "go.dependencies.reveal.in.os.linux",
+        "title": " Reveal in Explorer View"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "go.dependencies.refresh",
+          "when": "view == go.dependencies.explorer",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "when": "view == 'go.dependencies.explorer'",
+          "command": "go.dependencies.open.in.integrated.terminal"
+        },
+        {
+          "when": "view == 'go.dependencies.explorer' && isWindows",
+          "command": "go.dependencies.reveal.in.os.windows"
+        },
+        {
+          "when": "view == 'go.dependencies.explorer' && isMac",
+          "command": "go.dependencies.reveal.in.os.mac"
+        },
+        {
+          "when": "view == 'go.dependencies.explorer' && isLinux",
+          "command": "go.dependencies.reveal.in.os.limux"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
@@ -41,7 +93,9 @@
   "devDependencies": {
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
+    "@types/semver": "^7.5.8",
     "@types/vscode": "^1.96.0",
+    "@types/wu": "^2.1.44",
     "@typescript-eslint/eslint-plugin": "^8.17.0",
     "@typescript-eslint/parser": "^8.17.0",
     "@vscode/test-cli": "^0.0.10",
@@ -49,5 +103,8 @@
     "esbuild": "0.24.2",
     "eslint": "^9.16.0",
     "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "wu": "^2.1.0"
   }
 }
