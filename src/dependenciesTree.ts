@@ -1,10 +1,9 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import wu from 'wu';
-import { Directory, flat } from './dir';
-import path, { parse, join } from 'path';
+import { Directory, flat, normalizeWinPath } from './dir';
+import { parse, join } from 'path';
 import { GoExec } from './go';
-import { getWorkspaceFileDirs } from './vscodeUtils';
 import { promisify } from 'util';
 
 export const GO_MOD_PATTERN = '**/go.mod';
@@ -113,18 +112,15 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
     const filePattern = '**/go.{mod,sum}';
     const gofileWatcher = vscode.workspace.createFileSystemWatcher(filePattern);
     this.subscriptions.push(gofileWatcher);
-    gofileWatcher.onDidCreate(e => this.updateDirs('create', filePattern, e));
-    gofileWatcher.onDidChange(e => this.updateDirs('change', filePattern, e));
-    gofileWatcher.onDidDelete(e => this.updateDirs('delete', filePattern, e));
+    gofileWatcher.onDidCreate(e => this.handleFileEvent('create', filePattern, e));
+    gofileWatcher.onDidChange(e => this.handleFileEvent('change', filePattern, e));
+    gofileWatcher.onDidDelete(e => this.handleFileEvent('delete', filePattern, e));
     return gofileWatcher;
   }
 
-  private async updateDirs(op: string, filePattern: vscode.GlobPattern, event: vscode.Uri) {
-    console.debug(`updateDirs: ${op}, ${filePattern}, ${event}`);
-    // const fsPath = path.parse(event.fsPath);
-    // if (fsPath.ext === '.go' || (fsPath.name === 'go' && (fsPath.ext === 'mod' || fsPath.ext === 'sum'))) {
+  private async handleFileEvent(op: string, filePattern: vscode.GlobPattern, event: vscode.Uri) {
+    console.debug(`handleFileEvent: ${op}, ${filePattern}, ${event}`);
     await this.refresh();
-    // }
   }
 
   private initModulesDir(modules: GoPackageDirs) {
@@ -296,7 +292,7 @@ async function getGoStdLibPackageDirs(goExec: GoExec): Promise<GoPackageDirs> {
 
   const goRoot = env['GOROOT'];
 
-  const stdLibDir = join(`${goRoot}`, 'src');
+  const stdLibDir = normalizeWinPath(join(`${goRoot}`, 'src'));
   console.debug(`retrieving Go package for standart library ${stdLibDir}`);
 
   const stdGoPackageDirs = await getPackageDirs(stdLibDir);
@@ -340,7 +336,7 @@ async function getGoModulesPackageDirs(goExec: GoExec): Promise<GoPackageDirs> {
 
   const modulePackageDirs = (await Promise.all(allModuleDirs.map(async d => await getPackageDirs(d)))).flatMap(dd => dd);
 
-  const root = Directory.create(modulePackageDirs, `${goModCache}`, 'External packages');
+  const root = Directory.create(modulePackageDirs, normalizeWinPath(`${goModCache}`), 'External packages');
   const flatDirs = flat([root]);
 
   return { root: root, flatDirs: flatDirs };

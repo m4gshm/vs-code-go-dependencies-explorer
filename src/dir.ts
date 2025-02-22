@@ -45,18 +45,10 @@ export function flat(dirs: Directory[]) {
     }
 }
 
-const isWin = process.platform === "win32";
-
 class DirHierarchyBuilder {
 
     static newHierarchyBuilder(dirPath: string, expectedRootDir: string, expectedRootName: string) {
-        if (isWin) {
-            const path = parse(dirPath);
-            const lcRoot = path.root.toLowerCase();
-            if (lcRoot !== path.root) {
-                dirPath = lcRoot + dirPath.substring(lcRoot.length, dirPath.length);
-            }
-        }
+        dirPath = normalizeWinPath(dirPath);
         let first: DirHierarchyBuilder | undefined;
         let parentDir = dirPath;
         for (; ;) {
@@ -116,6 +108,19 @@ class DirHierarchyBuilder {
     public toDirectory(): Directory {
         return new Directory(this.label, this.name, this.parentPath, this.findFiles, Array.from(this.subdirs.values()).map(d => d.toDirectory()));
     }
+}
+
+const isWin = process.platform === "win32";
+
+export function normalizeWinPath(dirPath: string) {
+    if (isWin) {
+        const path = parse(dirPath);
+        const lcRoot = path.root.toLowerCase();
+        if (lcRoot !== path.root) {
+            dirPath = lcRoot + dirPath.substring(lcRoot.length, dirPath.length);
+        }
+    }
+    return dirPath;
 }
 
 function collapseAll(roots: Map<string, DirHierarchyBuilder>) {

@@ -77,7 +77,7 @@
         },
         {
           "when": "view == 'go.dependencies.explorer' && isLinux",
-          "command": "go.dependencies.reveal.in.os.limux"
+          "command": "go.dependencies.reveal.in.os.linux"
         }
       ]
     }
