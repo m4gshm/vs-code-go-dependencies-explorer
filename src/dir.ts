@@ -1,83 +1,75 @@
-import { sep, parse, join } from 'path';
+import { parse, join } from 'path';
+import { Uri } from 'vscode';
 
 export class Directory {
     constructor(
         public readonly label: string,
-        public readonly name: string,
-        public readonly parent: string | undefined,
+        public readonly path: string,
         public readonly findFiles: boolean,
         public readonly subdirs: Directory[],
     ) {
     }
+}
 
-    public static create(dirPaths: string[], expectedRootDir: string, expectedRootName: string) {
-        let root = DirHierarchyBuilder.newHierarchyBuilder(expectedRootDir, expectedRootDir, expectedRootName);
+export function flat(dirs: Directory[]) {
+    return new Map(dirs.flatMap(dir => {
+        const path = dir.path;
+        const flatSubdirs: [string, Directory][] = Array.from(flat(dir.subdirs).entries());
+        const pairs: [string, Directory][] = [[path, dir], ...flatSubdirs];
+        return pairs;
+    }));
+}
+
+export class DirHierarchyBuilder {
+
+    public static create(dirPaths: string[], expectedRootDir: string, expectedRootDirReplace: string, expectedRootName: string) {
+        let root = DirHierarchyBuilder.newHierarchyBuilder(expectedRootDir, expectedRootDir, expectedRootDirReplace, expectedRootName);
         for (let dirPath of dirPaths) {
-            let newRoot = DirHierarchyBuilder.newHierarchyBuilder(dirPath, expectedRootDir, expectedRootName);
+            let newRoot = DirHierarchyBuilder.newHierarchyBuilder(dirPath, expectedRootDir, expectedRootDirReplace, expectedRootName);
             if (root) {
-                if (newRoot && root.parentPath === newRoot.parentPath && root.name === newRoot.name) {
+                if (newRoot && root.path === newRoot.path) {
                     root.merge(newRoot);
-                } else {
+                } else { 
                     //log
                 }
             }
         }
         const [_, collapsedRoot] = collapse(expectedRootDir, root);
-        return collapsedRoot.toDirectory();
+        return collapsedRoot;
     }
 
-}
-
-export function flat(dirs: Directory[]) {
-    return new Map(dirs.flatMap(dir => {
-        const path = concat(dir.parent, dir.name);
-        const flatSubdirs: [string, Directory][] = Array.from(flat(dir.subdirs).entries());
-        const pairs: [string, Directory][] = [[path, dir], ...flatSubdirs];
-        return pairs;
-    }));
-
-    function concat(parent: string | undefined, subdir: string): string {
-        if (!parent) {
-            return subdir;
-        } else {
-            return parent.endsWith(sep) ? parent + subdir : parent + sep + subdir;
-        }
-    }
-}
-
-class DirHierarchyBuilder {
-
-    static newHierarchyBuilder(dirPath: string, expectedRootDir: string, expectedRootName: string) {
+    static newHierarchyBuilder(dirPath: string, expectedRootDir: string, expectedRootDirReplace: string, expectedRootName: string) {
         dirPath = normalizeWinPath(dirPath);
-        let first: DirHierarchyBuilder | undefined;
-        let parentDir = dirPath;
-        for (; ;) {
-            const isExpectedRoot = expectedRootDir === parentDir;
-            const path = parse(parentDir);
-            const name = path.name + path.ext;
+        if (!dirPath.startsWith(expectedRootDir)) {
+            throw new Error(`path "${dirPath}" must be start from "${expectedRootDir}"`);
+        }
+        const expectedRootPathReplace = Uri.file(expectedRootDirReplace).fsPath;
+        let dirPathPart = dirPath.substring(expectedRootDir.length, dirPath.length);
+        let root: DirHierarchyBuilder | undefined;
+        let findFiles = true;
+        for (; dirPathPart.length > 0;) {
+            const parsed = parse(dirPathPart);
+            const parentParentDir = parsed.dir;
+            const name = parsed.name + parsed.ext;
             if (name.length === 0) {
                 break;
             }
-            const label = isExpectedRoot ? expectedRootName : name;
-            if (!first) {
-                first = new DirHierarchyBuilder(true, label, name, path.dir, new Map());
-            } else {
-                const newRoot = new DirHierarchyBuilder(true, label, name, path.dir, new Map());
-                newRoot.subdirs.set(first.name!!, first);
-                first.root = false;
-                first.findFiles = true;
-                first = newRoot;
+            const path = join(expectedRootPathReplace, join(parentParentDir, name));
+            const newRoot = new DirHierarchyBuilder(false, name, path, new Map(), findFiles);
+            if (root) {
+                newRoot.subdirs.set(root.name, root);
             }
-            if (isExpectedRoot) {
-                break;
-            }
-            parentDir = path.dir;
+            root = newRoot;
+            dirPathPart = parentParentDir;
+            findFiles = false;
         }
 
-        if (!first) {
-            first = new DirHierarchyBuilder(true, expectedRootName, expectedRootDir, undefined, new Map());
+        const sub = root;
+        root = new DirHierarchyBuilder(true, expectedRootName, expectedRootPathReplace, new Map());
+        if (sub) {
+            root.subdirs.set(sub.name, sub);
         }
-        return first;
+        return root;
     }
 
     public get isGoPackage(): boolean {
@@ -86,9 +78,8 @@ class DirHierarchyBuilder {
 
     constructor(
         public root: boolean,
-        public label: string,
         public name: string,
-        public parentPath: string | undefined,
+        public path: string,
         public subdirs: Map<string, DirHierarchyBuilder>,
         public findFiles: boolean = false,
     ) {
@@ -106,7 +97,7 @@ class DirHierarchyBuilder {
     }
 
     public toDirectory(): Directory {
-        return new Directory(this.label, this.name, this.parentPath, this.findFiles, Array.from(this.subdirs.values()).map(d => d.toDirectory()));
+        return new Directory(this.name, this.path, this.findFiles, Array.from(this.subdirs.values()).map(d => d.toDirectory()));
     }
 }
 
@@ -138,11 +129,10 @@ function collapse(name: string, dir: DirHierarchyBuilder): [string, DirHierarchy
     const single = collapsedSubdirs.size === 1;
     if (!root && !isGoPackage && single) {
         const [subdirName, subdir] = collapsedSubdirs.entries().next().value!!;
-        const collapsedSubdirName = dir.name ? join(dir.name, subdirName) : subdirName;
-        subdir.name = collapsedSubdirName;
-        subdir.parentPath = dir.parentPath;
+        const collapsedPath = dir.path ? join(dir.path, subdirName) : subdirName;
+        subdir.path = collapsedPath;
         subdir.root = dir.root;
-        return [collapsedSubdirName, subdir];
+        return [collapsedPath, subdir];
     }
 
     dir.subdirs = collapsedSubdirs;

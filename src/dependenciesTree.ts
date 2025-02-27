@@ -1,41 +1,52 @@
-import * as vscode from 'vscode';
 import * as fs from 'fs';
 import wu from 'wu';
-import { Directory, flat, normalizeWinPath } from './dir';
+import { Directory, DirHierarchyBuilder, flat, normalizeWinPath } from './dir';
 import { parse, join } from 'path';
 import { GoExec } from './go';
 import { promisify } from 'util';
+import { FsUriConverter, ROOT_EXT_PACK, ROOT_STD_LIB, SCHEME } from './readonlyFs';
+import {
+  commands, EventEmitter, FileSystem, FileType, GlobPattern, Tab, TabInputText, Disposable,
+  TreeDataProvider, TreeItem, TreeItemCollapsibleState, TreeView, Uri, window, workspace
+} from 'vscode';
 
 export const GO_MOD_PATTERN = '**/go.mod';
 export const GO_SUM_PATTERN = '**/go.sum';
 
-export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
-  private readonly subscriptions: vscode.Disposable[] = [];
-  // private readonly watchers: fs.FSWatcher[];
-  private readonly treeView: vscode.TreeView<vscode.TreeItem>;
-  private readonly filesystemScheme: string;
+export class GoDependenciesTreeProvider implements TreeDataProvider<TreeItem> {
+  private readonly subscriptions: Disposable[] = [];
+  private readonly treeView: TreeView<TreeItem>;
   private readonly goExec: GoExec;
+  private readonly fs: FileSystem;
+  private readonly uriConv: FsUriConverter;
+  private readonly extPackagesDir: string;
 
   private treeVisible = false;
 
   private readonly stdLibDirs: Map<string, GoDirItem>;
   private readonly stdLibRootDir: GoDirItem;
-  private modulesRootDir: GoDirItem | undefined;
+  private modulesRootDir!: GoDirItem;
   private modulesDirs: Map<string, GoDirItem> = new Map();
 
-  static async setup(goExec: GoExec, filesystemScheme: string) {
-    const std = await getGoStdLibPackageDirs(goExec);
-    const modules = await getGoModulesPackageDirs(goExec);
-    return new this(goExec, filesystemScheme, std, modules);
+  static async setup(fs: FileSystem, uriConv: FsUriConverter,
+    goExec: GoExec, stdLibDir: string, extPackagesDir: string
+  ) {
+    const std = await getGoStdLibPackageDirs(stdLibDir);
+    const modules = await getGoModulesPackageDirs(extPackagesDir, goExec);
+    return new this(fs, uriConv, goExec, std, modules, extPackagesDir);
   }
 
-  private constructor(goExec: GoExec, filesystemScheme: string, std: GoPackageDirs, modules: GoPackageDirs) {
+  private constructor(fs: FileSystem, uriConv: FsUriConverter,
+    goExec: GoExec, std: GoPackageDirs, modules: GoPackageDirs, extPackagesDir: string
+  ) {
+    this.fs = fs;
+    this.uriConv = uriConv;
     this.goExec = goExec;
     this.stdLibRootDir = newGoDirItem(std.root);
     this.stdLibDirs = convertToGoDirs(std.flatDirs);
+    this.extPackagesDir = extPackagesDir;
     this.initModulesDir(modules);
-    this.filesystemScheme = filesystemScheme;
-    this.treeView = vscode.window.createTreeView("go.dependencies.explorer", {
+    this.treeView = window.createTreeView("go.dependencies.explorer", {
       showCollapseAll: true, treeDataProvider: this,
     });
     this.subscriptions.push(this.treeView);
@@ -44,9 +55,9 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
       for (const selection of selections) {
         const fileUri = selection.resourceUri;
         if (fileUri) {
-          const newUri = replaceUriScheme(fileUri, 'file');
-          await vscode.workspace.openTextDocument(newUri).then(
-            document => vscode.window.showTextDocument(document)
+          const newUri = this.uriConv.toFsUri(fileUri);
+          await workspace.openTextDocument(newUri || fileUri).then(
+            document => window.showTextDocument(document)
           );
         }
       }
@@ -60,7 +71,7 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
       }
     }));
 
-    this.subscriptions.push(vscode.window.tabGroups.onDidChangeTabs(tabs => {
+    this.subscriptions.push(window.tabGroups.onDidChangeTabs(tabs => {
       if (this.treeVisible) {
         for (const tab of tabs.opened) {
           this.selectFileOfActiveTabInTree(tab);
@@ -71,32 +82,33 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
       }
     }));
 
-    this.subscriptions.push(vscode.commands.registerCommand('go.dependencies.open.in.integrated.terminal', async item => {
+    this.subscriptions.push(commands.registerCommand('go.dependencies.open.in.integrated.terminal', async item => {
       await execCommandOnItem('openInIntegratedTerminal', item);
     }));
 
     ['mac', 'windows', 'linux'].forEach(os => {
-      this.subscriptions.push(vscode.commands.registerCommand(`go.dependencies.reveal.in.os.${os}`, async item => {
+      this.subscriptions.push(commands.registerCommand(`go.dependencies.reveal.in.os.${os}`, async item => {
         await execCommandOnItem('revealFileInOS', item);
       }));
     });
 
-    vscode.commands.registerCommand('go.dependencies.refresh', async () => await this.refresh());
+    commands.registerCommand('go.dependencies.refresh', async () => await this.refresh());
     this.watchChanges();
 
     async function execCommandOnItem(command: string, item: any,) {
-      let uri = getUriOfSelectedItem(item);
+      let uri = getFsUriOfSelectedItem(item);
       if (uri) {
-        await vscode.commands.executeCommand(command, uri);
+        await commands.executeCommand(command, uri);
       }
-      function getUriOfSelectedItem(item: any) {
-        let uri: vscode.Uri | undefined;
+      function getFsUriOfSelectedItem(item: any) {
+        let uri: Uri | undefined;
         if (item instanceof FileItem) {
-          uri = vscode.Uri.file(item.filePath);
+          // uri = item.resourceUri;
+          uri = Uri.file(item.filePath);
         } else if (item instanceof GoDirItem) {
           const path = item.id;
           if (path) {
-            uri = vscode.Uri.file(path);
+            uri = Uri.file(path);
           } else {
             console.warn("undefined path of item: " + item);
           }
@@ -110,7 +122,7 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
 
   private watchChanges() {
     const filePattern = '**/go.{mod,sum}';
-    const gofileWatcher = vscode.workspace.createFileSystemWatcher(filePattern);
+    const gofileWatcher = workspace.createFileSystemWatcher(filePattern);
     this.subscriptions.push(gofileWatcher);
     gofileWatcher.onDidCreate(e => this.handleFileEvent('create', filePattern, e));
     gofileWatcher.onDidChange(e => this.handleFileEvent('change', filePattern, e));
@@ -118,7 +130,7 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
     return gofileWatcher;
   }
 
-  private async handleFileEvent(op: string, filePattern: vscode.GlobPattern, event: vscode.Uri) {
+  private async handleFileEvent(op: string, filePattern: GlobPattern, event: Uri) {
     console.debug(`handleFileEvent: ${op}, ${filePattern}, ${event}`);
     await this.refresh();
   }
@@ -129,27 +141,32 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
   }
 
   private syncActiveTabWithTree() {
-    const activeTab = vscode.window.tabGroups.activeTabGroup.activeTab;
+    const activeTab = window.tabGroups.activeTabGroup.activeTab;
     if (activeTab) {
       this.selectFileOfActiveTabInTree(activeTab);
     }
   }
 
-  private selectFileOfActiveTabInTree(tab: vscode.Tab) {
+  private selectFileOfActiveTabInTree(tab: Tab) {
     if (tab.isActive) {
       const input = tab.input;
-      const textInput = input instanceof vscode.TabInputText ? input as vscode.TabInputText : undefined;
+      const textInput = input instanceof TabInputText ? input as TabInputText : undefined;
       if (textInput) {
-        const fsPath = textInput.uri.fsPath;
-        const filePath = parse(fsPath);
-        const dir = filePath.dir;
-        if (this.isPackageDir(dir)) {
-          vscode.commands.executeCommand("workbench.action.files.setActiveEditorReadonlyInSession");
-          this.treeView?.reveal({
-            id: fsPath,
-            focus: true,
-            select: true,
-          } as vscode.TreeItem);
+        const fileUri = textInput.uri;
+        const depUri = this.uriConv.toDepUri(fileUri);
+        if (depUri) {
+          const fsPath = depUri.fsPath;
+          const filePath = parse(fsPath);
+          const dir = filePath.dir;
+          if (this.isPackageDir(dir)) {
+            commands.executeCommand("workbench.action.files.setActiveEditorReadonlyInSession");
+            const openPath = depUri.fsPath;//this.uriConv.toFsUri(fileUri).fsPath;
+            this.treeView?.reveal({
+              id: openPath,
+              focus: true,
+              select: true,
+            } as TreeItem);
+          }
         }
       }
     }
@@ -159,26 +176,29 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
     return this.stdLibDirs.has(dir) || this.modulesDirs.has(dir);
   }
 
-  getTreeItem(element: vscode.TreeItem): vscode.TreeItem {
+  getTreeItem(element: TreeItem): TreeItem {
     return element;
   }
 
-  async getChildren(element?: vscode.TreeItem): Promise<vscode.TreeItem[]> {
+  async getChildren(element?: TreeItem): Promise<TreeItem[]> {
     if (element instanceof GoDirItem) {
       let children = element.children;
       if (children) {
         return Promise.resolve(children);
       }
       const dir = element.dir;
-      const p = dir.parent;
-      const dirPath = p ? join(p, dir.name) : dir.name;
-      const dirContent = dir.findFiles ? await vscode.workspace.fs.readDirectory(vscode.Uri.file(dirPath)) : [];
-      const files: vscode.TreeItem[] = dirContent.filter(([_, type]) => {
-        return type !== vscode.FileType.Directory;
+      const dirUri = dependencyUri(dir.path);
+      const newUri = this.uriConv.toFsUri(dirUri);
+      if (!newUri) {
+        throw new Error(`Bad dependency dir "${dirUri}"`);
+      }
+      const dirContent = dir.findFiles ? await this.fs.readDirectory(newUri) : [];
+      const files: TreeItem[] = dirContent.filter(([_, type]) => {
+        return type !== FileType.Directory;
       }).map(([filename, _]) => {
-        return new FileItem(filename, dirPath!!, this.filesystemScheme);
+        return new FileItem(filename, dir.path!!);
       });
-      const subdirs: vscode.TreeItem[] = dir.subdirs.map(d => newGoDirItem(d));
+      const subdirs: TreeItem[] = dir.subdirs.map(d => newGoDirItem(d));
       children = [...subdirs, ...files];
       element.children = children;
       return Promise.resolve(children);
@@ -194,7 +214,7 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
     }
   }
 
-  getParent(element: vscode.TreeItem): vscode.TreeItem | undefined {
+  getParent(element: TreeItem): TreeItem | undefined {
     const id = element.id;
     if (id) {
       let nextLevelPath = id;
@@ -215,7 +235,7 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
     return undefined;
   }
 
-  private _onDidChangeTreeData: vscode.EventEmitter<undefined> = new vscode.EventEmitter<undefined>();
+  private _onDidChangeTreeData: EventEmitter<undefined> = new EventEmitter<undefined>();
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
   private getGoDirItem(nextLevelPath: string): GoDirItem | undefined {
@@ -223,47 +243,18 @@ export class GoDependenciesTreeProvider implements vscode.TreeDataProvider<vscod
   }
 
   async refresh() {
-    this.initModulesDir(await getGoModulesPackageDirs(this.goExec));
+    this.initModulesDir(await getGoModulesPackageDirs(this.extPackagesDir, this.goExec));
     this._onDidChangeTreeData.fire(undefined);
   }
 
   public dispose() {
     this._onDidChangeTreeData.dispose();
     this.subscriptions.forEach(s => s.dispose());
-    // this.watchers.forEach(watcher => watcher.close());
   }
 }
 
-class GoDirItem extends vscode.TreeItem {
-  constructor(
-    public readonly dir: Directory,
-    public children: vscode.TreeItem[] | undefined = undefined
-  ) {
-    super(dir.label, vscode.TreeItemCollapsibleState.Collapsed);
-    const fullPath = dir.parent ? join(dir.parent, dir.name) : dir.name;
-    this.id = fullPath;
-    this.tooltip = fullPath;
-    this.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
-  }
-}
-
-class FileItem extends vscode.TreeItem {
-  constructor(
-    public readonly fileName: string,
-    public readonly filePath: string,
-    public readonly filesystemScheme: string | undefined = undefined,
-  ) {
-    super(fileName);
-    const fillFilePath = join(filePath, fileName);
-    let uri = vscode.Uri.file(fillFilePath);
-    uri = replaceUriScheme(uri, filesystemScheme);
-    this.id = fillFilePath;
-    this.resourceUri = uri;
-  }
-}
-
-function newGoDirItem(std: Directory): GoDirItem {
-  return new GoDirItem(std);
+function newGoDirItem(dir: Directory): GoDirItem {
+  return new GoDirItem(dir);
 }
 
 function convertToGoDirs(flatDirs: Map<string, Directory>): Map<string, GoDirItem> {
@@ -271,12 +262,16 @@ function convertToGoDirs(flatDirs: Map<string, Directory>): Map<string, GoDirIte
 }
 
 async function getGoModuleDirs() {
-  return (await vscode.workspace.findFiles(GO_MOD_PATTERN)).map(f => parse(f.fsPath).dir);
+  return (await workspace.findFiles(GO_MOD_PATTERN)).map(f => parse(f.fsPath).dir);
 }
 
-function replaceUriScheme(uri: vscode.Uri, newScheme: string | undefined) {
+function dependencyUri(path: string) {
+  return replaceUriScheme(SCHEME, Uri.file(path));
+}
+
+function replaceUriScheme(newScheme: string, uri: Uri) {
   if (newScheme && uri.scheme !== newScheme) {
-    return vscode.Uri.from({
+    return Uri.from({
       scheme: newScheme,
       authority: uri.authority,
       path: uri.path,
@@ -287,26 +282,24 @@ function replaceUriScheme(uri: vscode.Uri, newScheme: string | undefined) {
   return uri;
 }
 
-async function getGoStdLibPackageDirs(goExec: GoExec): Promise<GoPackageDirs> {
-  const env = await goExec.getEnv();
-
-  const goRoot = env['GOROOT'];
-
-  const stdLibDir = normalizeWinPath(join(`${goRoot}`, 'src'));
+async function getGoStdLibPackageDirs(stdLibDir: string): Promise<GoPackageDirs> {
   console.debug(`retrieving Go package for standart library ${stdLibDir}`);
 
   const stdGoPackageDirs = await getPackageDirs(stdLibDir);
-
-  const root = Directory.create(stdGoPackageDirs, stdLibDir, 'Standard library');
+  const label = 'Standard library';
+  const root = DirHierarchyBuilder.create(stdGoPackageDirs, stdLibDir, ROOT_STD_LIB, label).toDirectory();
   const flatDirs = flat([root]);
 
   return { root: root, flatDirs: flatDirs };
 }
 
-async function getGoModulesPackageDirs(goExec: GoExec): Promise<GoPackageDirs> {
-  const env = await goExec.getEnv();
+export function getStdLibDir(env: any) {
+  const goRoot = env['GOROOT'];
+  const stdLibDir = normalizeWinPath(join(`${goRoot}`, 'src'));
+  return stdLibDir;
+}
 
-  const goModCache = env['GOMODCACHE'];
+async function getGoModulesPackageDirs(extPackagesDir: string, goExec: GoExec): Promise<GoPackageDirs> {
 
   const dirs = await getGoModuleDirs();
   console.debug(`retrieving Go module directories ${dirs}`);
@@ -327,7 +320,7 @@ async function getGoModulesPackageDirs(goExec: GoExec): Promise<GoPackageDirs> {
       const message = err instanceof Error ? err.message : `${err}`;
       const errMessage = `Module error: '${moduelDir}', ${message}`;
       console.info(errMessage);
-      // vscode.window.showErrorMessage(errMessage);
+      // window.showErrorMessage(errMessage);
     }
   });
 
@@ -336,10 +329,18 @@ async function getGoModulesPackageDirs(goExec: GoExec): Promise<GoPackageDirs> {
 
   const modulePackageDirs = (await Promise.all(allModuleDirs.map(async d => await getPackageDirs(d)))).flatMap(dd => dd);
 
-  const root = Directory.create(modulePackageDirs, normalizeWinPath(`${goModCache}`), 'External packages');
+  const name = 'External packages';
+  const root = DirHierarchyBuilder.create(modulePackageDirs, extPackagesDir, ROOT_EXT_PACK, name).toDirectory();
   const flatDirs = flat([root]);
 
   return { root: root, flatDirs: flatDirs };
+}
+
+export async function getExtPackagesDir(goExec: GoExec) {
+  const env = await goExec.getEnv();
+  const goModCache = env['GOMODCACHE'];
+  const packagesDir = normalizeWinPath(`${goModCache}`);
+  return packagesDir;
 }
 
 async function getPackageDirs(dir: string) {
@@ -366,7 +367,31 @@ async function listGoPackageDirs(dirPath: string): Promise<string[]> {
   }
 }
 
+class GoDirItem extends TreeItem {
+  constructor(
+    public readonly dir: Directory,
+    public children: TreeItem[] | undefined = undefined
+  ) {
+    super(dir.label, TreeItemCollapsibleState.Collapsed);
+    this.id = dir.path;
+    this.collapsibleState = TreeItemCollapsibleState.Collapsed;
+  }
+}
+
+class FileItem extends TreeItem {
+  constructor(
+    public readonly fileName: string,
+    public readonly filePath: string,
+  ) {
+    super(fileName);
+    const fillFilePath = join(filePath, fileName);
+    this.id = fillFilePath;
+    this.resourceUri = dependencyUri(fillFilePath);
+  }
+}
+
 interface GoPackageDirs {
   root: Directory;
   flatDirs: Map<string, Directory>;
 }
+
