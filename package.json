@@ -14,7 +14,7 @@
     "onLanguage:go.sum",
     "onLanguage:gotmpl"
   ],
-  "main": "./out/extension.js",
+  "main": "./dist/extension.js",
   "contributes": {
     "views": {
       "explorer": [
@@ -82,10 +82,10 @@
   "scripts": {
     "clean": "rm -rf ./dist/* && rm -rf ./out/*",
     "check-types": "tsc --noEmit",
-    "compile2": "npm run clean check-types && node esbuild.js",
-    "package": "npm run clean check-types && node esbuild.js --production",
-    "vscode:prepublish": "npm run clean package",
-    "compile": "tsc -p ./",
+    "package": "npx vsce package",
+    "vscode:prepublish": "npm run clean && npm run bundle",
+    "compile": "npm run clean && tsc -p ./",
+    "bundle": "node esbuild.js",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
@@ -108,5 +108,8 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/m4gshm/vs-code-go-dependencies-explorer.git"
+  },
+  "dependencies": {
+    "npx": "^10.2.2"
   }
 }
