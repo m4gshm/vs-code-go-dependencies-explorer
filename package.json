@@ -80,7 +80,8 @@
     }
   },
   "scripts": {
-    "clean": "rm -rf ./dist/* && rm -rf ./out/*",
+    "rimraf": "./node_modules/rimraf/bin.js",
+    "clean": "rimraf ./dist ./out",
     "check-types": "tsc --noEmit",
     "package": "npx vsce ls && npx vsce package",
     "vscode:prepublish": "npm run clean && npm run bundle",
@@ -104,6 +105,7 @@
     "@vscode/test-electron": "^2.4.1",
     "esbuild": "^0.25.0",
     "eslint": "^9.16.0",
+    "rimraf": "^6.0.1",
     "typescript": "^5.7.2"
   },
   "repository": {
@@ -111,6 +113,7 @@
     "url": "https://github.com/m4gshm/vs-code-go-dependencies-explorer.git"
   },
   "dependencies": {
-    "npx": "^10.2.2"
+    "npx": "^10.2.2",
+    "vsce": "^2.15.0"
   }
 }
