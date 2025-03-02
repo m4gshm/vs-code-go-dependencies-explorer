@@ -82,7 +82,7 @@
   "scripts": {
     "clean": "rm -rf ./dist/* && rm -rf ./out/*",
     "check-types": "tsc --noEmit",
-    "package": "npx vsce package",
+    "package": "npx vsce ls && npx vsce package",
     "vscode:prepublish": "npm run clean && npm run bundle",
     "compile": "npm run clean && tsc -p ./",
     "bundle": "node esbuild.js",

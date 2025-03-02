@@ -11,3 +11,4 @@ vsc-extension-quickstart.md
 **/.vscode-test.*
 go-stub/
 node_modules
+esbuild.js
