@@ -12,10 +12,7 @@
   "activationEvents": [
     "onLanguage:go",
     "onLanguage:go.sum",
-    "onLanguage:gotmpl",
-    "onDebugInitialConfigurations",
-    "onDebugResolve:go",
-    "onWebviewPanel:welcomeGo"
+    "onLanguage:gotmpl"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -83,7 +80,11 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "clean": "rm -rf ./dist/* && rm -rf ./out/*",
+    "check-types": "tsc --noEmit",
+    "compile2": "npm run clean check-types && node esbuild.js",
+    "package": "npm run clean check-types && node esbuild.js --production",
+    "vscode:prepublish": "npm run clean package",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
@@ -100,11 +101,12 @@
     "@typescript-eslint/parser": "^8.17.0",
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.4.1",
-    "esbuild": "0.24.2",
+    "esbuild": "^0.24.2",
     "eslint": "^9.16.0",
     "typescript": "^5.7.2"
   },
-  "dependencies": {
-    "wu": "^2.1.0"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/m4gshm/vs-code-go-dependencies-explorer.git"
   }
 }
