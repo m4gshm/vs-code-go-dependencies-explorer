@@ -84,7 +84,7 @@
     "check-types": "tsc --noEmit",
     "package": "npx vsce ls && npx vsce package",
     "vscode:prepublish": "npm run clean && npm run bundle",
-    "compile": "npm run clean && tsc -p ./",
+    "compile": "tsc -p ./",
     "bundle": "node esbuild.js",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
