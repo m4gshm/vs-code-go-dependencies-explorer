@@ -12,3 +12,4 @@ vsc-extension-quickstart.md
 go-stub/
 node_modules
 esbuild.js
+.DS_Store

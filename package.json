@@ -2,7 +2,7 @@
   "name": "vs-code-go-dependencies-explorer",
   "displayName": "Go dependencies explorer",
   "description": "File explorer for quickly accessing Go package resources such as .go files and so on.",
-  "version": "0.0.1",
+  "version": "0.0.1-dev",
   "engines": {
     "vscode": "^1.96.0"
   },
