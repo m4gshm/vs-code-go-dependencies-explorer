@@ -1,0 +1,29 @@
+name: Handle Release
+on:
+  release:
+    types: [created,edited]
+jobs:
+  generate:
+    name: create release-artifacts
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [23.9.x]
+    steps:
+      - name: checkout
+        uses: actions/checkout@v3
+      - name: init Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: package
+        run: |
+          npm install
+          npm test
+          npm run package       
+      - name: upload the artifacts
+        uses: skx/github-action-publish-binaries@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: '*.vsix'

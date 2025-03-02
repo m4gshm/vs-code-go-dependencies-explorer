@@ -4,7 +4,6 @@ import {
     FileType, FileSystem, Uri, FilePermission, FileSystemError,
     Disposable
 } from 'vscode';
-import wu from 'wu';
 
 export const SCHEME = 'go-dep-file';
 export const ROOT_STD_LIB = 'StdLib';
@@ -82,7 +81,7 @@ export function newFsUriConverter(stdLibDir: string, extPackagesDir: string): Fs
     return {
         toFsUri: (uri: Uri) => {
             if (uri.scheme === SCHEME) {
-                const found: [string, string] | undefined = wu(rootMap.entries()).find(([code, _]) => {
+                const found: [string, string] | undefined = Array.from(rootMap.entries()).find(([code, _]) => {
                     return uri.fsPath.startsWith(code);
                 });
                 if (found) {
@@ -97,7 +96,7 @@ export function newFsUriConverter(stdLibDir: string, extPackagesDir: string): Fs
         },
         toDepUri: (uri: Uri) => {
             if (uri.scheme === 'file') {
-                const found: [string, string] | undefined = wu(rootMap.entries()).find(([code, prefix]) => {
+                const found: [string, string] | undefined = Array.from(rootMap.entries()).find(([code, prefix]) => {
                     return uri.fsPath.startsWith(prefix);
                 });
                 if (found) {

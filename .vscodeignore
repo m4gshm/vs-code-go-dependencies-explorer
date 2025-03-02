@@ -9,3 +9,7 @@ vsc-extension-quickstart.md
 **/*.map
 **/*.ts
 **/.vscode-test.*
+go-stub/
+node_modules
+esbuild.js
+.DS_Store

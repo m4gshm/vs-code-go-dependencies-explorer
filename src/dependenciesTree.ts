@@ -1,5 +1,4 @@
 import * as fs from 'fs';
-import wu from 'wu';
 import { Directory, DirHierarchyBuilder, flat, normalizeWinPath } from './dir';
 import { parse, join } from 'path';
 import { GoExec } from './go';
@@ -258,7 +257,7 @@ function newGoDirItem(dir: Directory): GoDirItem {
 }
 
 function convertToGoDirs(flatDirs: Map<string, Directory>): Map<string, GoDirItem> {
-  return new Map(wu(flatDirs.entries()).map(([fullPath, dir]) => [fullPath, newGoDirItem(dir)]));
+  return new Map(Array.from(flatDirs.entries()).map(([fullPath, dir]) => [fullPath, newGoDirItem(dir)]));
 }
 
 async function getGoModuleDirs() {
