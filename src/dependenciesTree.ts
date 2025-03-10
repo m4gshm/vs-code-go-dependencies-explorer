@@ -82,6 +82,10 @@ export class GoDependenciesTreeProvider implements TreeDataProvider<TreeItem> {
       }
     }));
 
+    this.subscriptions.push(commands.registerCommand('go.dependencies.copy.path', async item => {
+      await execCommandOnItem('copyFilePath', item, this.uriConv);
+    }));
+
     this.subscriptions.push(commands.registerCommand('go.dependencies.open.in.integrated.terminal', async item => {
       await execCommandOnItem('openInIntegratedTerminal', item, this.uriConv);
     }));
@@ -103,7 +107,7 @@ export class GoDependenciesTreeProvider implements TreeDataProvider<TreeItem> {
       function getFsUriOfSelectedItem(item: any, uriConv: FsUriConverter) {
         let uri: Uri | undefined;
         if (item instanceof FileItem) {
-          uri = dependencyUri(item.filePath);
+          uri = dependencyUri(join(item.filePath, item.fileName));
         } else if (item instanceof GoDirItem) {
           const path = item.id;
           if (path) {
