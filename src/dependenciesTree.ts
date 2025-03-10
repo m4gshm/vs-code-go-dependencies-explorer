@@ -8,6 +8,7 @@ import {
   commands, EventEmitter, FileSystem, FileType, GlobPattern, Tab, TabInputText, Disposable,
   TreeDataProvider, TreeItem, TreeItemCollapsibleState, TreeView, Uri, window, workspace
 } from 'vscode';
+import { SHARE_ENV } from 'worker_threads';
 
 export const GO_MOD_PATTERN = '**/go.mod';
 export const GO_SUM_PATTERN = '**/go.sum';
@@ -82,37 +83,39 @@ export class GoDependenciesTreeProvider implements TreeDataProvider<TreeItem> {
     }));
 
     this.subscriptions.push(commands.registerCommand('go.dependencies.open.in.integrated.terminal', async item => {
-      await execCommandOnItem('openInIntegratedTerminal', item);
+      await execCommandOnItem('openInIntegratedTerminal', item, this.uriConv);
     }));
 
     ['mac', 'windows', 'linux'].forEach(os => {
       this.subscriptions.push(commands.registerCommand(`go.dependencies.reveal.in.os.${os}`, async item => {
-        await execCommandOnItem('revealFileInOS', item);
+        await execCommandOnItem('revealFileInOS', item, this.uriConv);
       }));
     });
 
     commands.registerCommand('go.dependencies.refresh', async () => await this.refresh());
     this.watchChanges();
 
-    async function execCommandOnItem(command: string, item: any,) {
-      let uri = getFsUriOfSelectedItem(item);
+    async function execCommandOnItem(command: string, item: any, uriConv: FsUriConverter) {
+      let uri = getFsUriOfSelectedItem(item, uriConv);
       if (uri) {
         await commands.executeCommand(command, uri);
       }
-      function getFsUriOfSelectedItem(item: any) {
+      function getFsUriOfSelectedItem(item: any, uriConv: FsUriConverter) {
         let uri: Uri | undefined;
         if (item instanceof FileItem) {
-          // uri = item.resourceUri;
-          uri = Uri.file(item.filePath);
+          uri = dependencyUri(item.filePath);
         } else if (item instanceof GoDirItem) {
           const path = item.id;
           if (path) {
-            uri = Uri.file(path);
+            uri = dependencyUri(path);
           } else {
             console.warn("undefined path of item: " + item);
           }
         } else {
           console.warn("unexpected item type: " + item);
+        }
+        if (uri) {
+          uri = uriConv.toFsUri(uri);
         }
         return uri;
       }
@@ -374,6 +377,7 @@ class GoDirItem extends TreeItem {
     super(dir.label, TreeItemCollapsibleState.Collapsed);
     this.id = dir.path;
     this.collapsibleState = TreeItemCollapsibleState.Collapsed;
+    this.tooltip = dir.label;
   }
 }
 
@@ -386,6 +390,7 @@ class FileItem extends TreeItem {
     const fillFilePath = join(filePath, fileName);
     this.id = fillFilePath;
     this.resourceUri = dependencyUri(fillFilePath);
+    this.tooltip = fileName;
   }
 }
 
