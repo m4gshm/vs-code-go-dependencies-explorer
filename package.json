@@ -16,6 +16,16 @@
   ],
   "main": "./dist/extension.js",
   "contributes": {
+    "configuration": {
+      "title": "GoDependenciesExplorer",
+      "properties": {
+        "go.dependencies.explorer.prevent.open.git.repo": {
+          "type": "boolean",
+          "default": true,
+          "description": "Prevent opening git repositories by opening files from \"Standard Library\" or \"External Packages\"."
+        }
+      }
+    },
     "views": {
       "explorer": [
         {
