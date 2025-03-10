@@ -3,7 +3,7 @@ import { getExtPackagesDir, getStdLibDir, GoDependenciesTreeProvider } from "./d
 import { GoExec } from './go';
 import { GoExtensionAPI } from './goExtension';
 import { GoDepFileSystemProvider, newFsUriConverter as newFsUriConverter, SCHEME } from './readonlyFs';
-import { GitExtension } from './git-extension';
+import { GitExtension } from './gitExtension';
 
 export async function activate(context: vscode.ExtensionContext) {
     const goExtension = vscode.extensions.getExtension('golang.go');
