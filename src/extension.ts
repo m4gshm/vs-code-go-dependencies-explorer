@@ -39,14 +39,20 @@ export async function activate(context: vscode.ExtensionContext) {
         if (gitApi) {
             context.subscriptions.push(gitApi?.onDidOpenRepository(repository => {
                 const preventOpenRepo = conf.get('prevent.open.git.repo');
-                if (preventOpenRepo) {
+                if (!(!preventOpenRepo || preventOpenRepo === 'off')) {
                     const rootUri = repository.rootUri;
                     const rootPath = rootUri.fsPath;
-
-                    [stdLibDir, extPackagesDir].forEach(dir => {
+                    [stdLibDir, extPackagesDir].forEach(async dir => {
                         if (rootPath.startsWith(dir) || dir.startsWith(rootPath)) {
-                            console.debug(`closes git repository intersecting with package directory (repo: ${rootPath}, packages dir: ${dir})`);
-                            vscode.commands.executeCommand('git.close', repository);
+                            let close = true;
+                            if (preventOpenRepo === 'ask') {
+                                const selection = await vscode.window.showWarningMessage(`Should the git repository "${rootPath}" be closed?`, 'Close', 'Cancel');
+                                close = selection === 'Close';
+                            }
+                            if (close) {
+                                console.debug(`closes git repository intersecting with package directory (repo: ${rootPath}, packages dir: ${dir})`);
+                                await vscode.commands.executeCommand('git.close', repository);
+                            }
                         }
                     });
 

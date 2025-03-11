@@ -20,8 +20,13 @@
       "title": "GoDependenciesExplorer",
       "properties": {
         "go.dependencies.explorer.prevent.open.git.repo": {
-          "type": "boolean",
-          "default": true,
+          "type": "string",
+          "enum": [
+            "ask",
+            "on",
+            "off"
+          ],
+          "default": "ask",
           "description": "Prevent opening git repositories by opening files from \"Standard Library\" or \"External Packages\"."
         }
       }
