@@ -1,8 +1,9 @@
 {
   "name": "vs-code-go-dependencies-explorer",
+  "publisher": "m4gshm",
   "displayName": "Go dependencies explorer",
   "description": "File explorer for quickly accessing Go package resources such as .go files and so on.",
-  "version": "0.0.1-dev",
+  "version": "0.0.1",
   "engines": {
     "vscode": "^1.96.0"
   },
@@ -16,6 +17,21 @@
   ],
   "main": "./dist/extension.js",
   "contributes": {
+    "configuration": {
+      "title": "GoDependenciesExplorer",
+      "properties": {
+        "go.dependencies.explorer.prevent.open.git.repo": {
+          "type": "string",
+          "enum": [
+            "ask",
+            "on",
+            "off"
+          ],
+          "default": "ask",
+          "description": "Prevent opening git repositories by opening files from \"Standard Library\" or \"External Packages\"."
+        }
+      }
+    },
     "views": {
       "explorer": [
         {
@@ -35,20 +51,24 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "go.dependencies.copy.path",
+        "title": "Copy Path"
+      },
+      {
         "command": "go.dependencies.open.in.integrated.terminal",
-        "title": " Open in Integrated Terminal"
+        "title": "Open in Integrated Terminal"
       },
       {
         "command": "go.dependencies.reveal.in.os.mac",
-        "title": " Reveal in Finder"
+        "title": "Reveal in Finder"
       },
       {
         "command": "go.dependencies.reveal.in.os.windows",
-        "title": " Reveal in File Explorer"
+        "title": "Reveal in File Explorer"
       },
       {
         "command": "go.dependencies.reveal.in.os.linux",
-        "title": " Reveal in Explorer View"
+        "title": "Reveal in Explorer View"
       }
     ],
     "menus": {
@@ -60,6 +80,10 @@
         }
       ],
       "view/item/context": [
+        {
+          "when": "view == 'go.dependencies.explorer'",
+          "command": "go.dependencies.copy.path"
+        },
         {
           "when": "view == 'go.dependencies.explorer'",
           "command": "go.dependencies.open.in.integrated.terminal"
@@ -103,6 +127,7 @@
     "@typescript-eslint/parser": "^8.17.0",
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.4.1",
+    "@vscode/vsce": "^3.2.2",
     "esbuild": ">=0.25.0",
     "eslint": "^9.16.0",
     "rimraf": "^6.0.1",
