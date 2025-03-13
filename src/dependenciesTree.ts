@@ -107,11 +107,7 @@ export class GoDependenciesTreeProvider implements TreeDataProvider<TreeItem> {
       function getFsUriOfSelectedItem(item: any, uriConv: FsUriConverter) {
         let uri: Uri | undefined;
         if (item instanceof FileItem) {
-<<<<<<< HEAD
           uri = dependencyUri(join(item.filePath, item.fileName));
-=======
-          uri = dependencyUri(item.filePath);
->>>>>>> 78ad6f0 (fix: reveal a selected dependency in a terminal or file explorer.)
         } else if (item instanceof GoDirItem) {
           const path = item.id;
           if (path) {
