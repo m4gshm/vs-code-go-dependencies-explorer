@@ -1,8 +1,9 @@
 {
   "name": "vs-code-go-dependencies-explorer",
+  "publisher": "m4gshm",
   "displayName": "Go dependencies explorer",
   "description": "File explorer for quickly accessing Go package resources such as .go files and so on.",
-  "version": "0.0.1-dev",
+  "version": "0.0.1",
   "engines": {
     "vscode": "^1.96.0"
   },
@@ -126,6 +127,7 @@
     "@typescript-eslint/parser": "^8.17.0",
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.4.1",
+    "@vscode/vsce": "^3.2.2",
     "esbuild": ">=0.25.0",
     "eslint": "^9.16.0",
     "rimraf": "^6.0.1",
