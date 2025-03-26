@@ -3,7 +3,7 @@
   "publisher": "m4gshm",
   "displayName": "Go dependencies explorer",
   "description": "File explorer for quickly accessing Go package resources such as .go files and so on.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "engines": {
     "vscode": "^1.96.0"
   },
@@ -37,8 +37,7 @@
         {
           "id": "go.dependencies.explorer",
           "name": "Dependencies",
-          "visibility": "hidden",
-          "when": "go.showExplorer"
+          "when": "go.dependencies.explorer.show"
         }
       ]
     },

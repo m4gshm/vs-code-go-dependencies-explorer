@@ -64,15 +64,13 @@ export class GoDependenciesTreeProvider implements TreeDataProvider<TreeItem> {
     }));
 
     this.subscriptions.push(this.treeView.onDidChangeVisibility(async event => {
-      const visible = event.visible;
-      this.treeVisible = visible;
-      if (this.treeVisible) {
+      if (event.visible) {
         this.syncActiveTabWithTree();
       }
     }));
 
     this.subscriptions.push(window.tabGroups.onDidChangeTabs(tabs => {
-      if (this.treeVisible) {
+      if (this.treeView.visible) {
         for (const tab of tabs.opened) {
           this.selectFileOfActiveTabInTree(tab);
         }
@@ -124,6 +122,7 @@ export class GoDependenciesTreeProvider implements TreeDataProvider<TreeItem> {
         return uri;
       }
     }
+    commands.executeCommand('setContext', 'go.dependencies.explorer.show', true);
   }
 
   private watchChanges() {
