@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import { Directory, DirHierarchyBuilder, flat, normalizeWinPath } from './dir';
-import { parse, join } from 'path';
+import path, { parse, join } from 'path';
 import { GoExec } from './go';
 import { promisify } from 'util';
 import { FsUriConverter, ROOT_EXT_PACK, ROOT_STD_LIB, SCHEME } from './readonlyFs';
@@ -267,7 +267,7 @@ function convertToGoDirs(flatDirs: Map<string, Directory>): Map<string, GoDirIte
 }
 
 async function getGoModuleDirs() {
-  return (await workspace.findFiles(GO_MOD_PATTERN)).map(f => parse(f.fsPath).dir);
+  return (await workspace.findFiles(GO_MOD_PATTERN)).map(f => parse(f.fsPath).dir).map(dir => normalizeWinPath(dir));
 }
 
 function dependencyUri(path: string) {
@@ -306,13 +306,19 @@ export function getStdLibDir(env: any) {
 
 async function getGoModulesPackageDirs(extPackagesDir: string, goExec: GoExec): Promise<GoPackageDirs> {
 
-  const dirs = await getGoModuleDirs();
-  console.debug(`retrieving Go module directories ${dirs}`);
+  const rootDirs = await getGoModuleDirs();
+  console.debug(`retrieving Go module directories ${rootDirs}`);
 
-  const moduleDirs = Array.from(new Set((await Promise.all(dirs.map(async dir => {
+  const moduleDirs = Array.from(new Set((await Promise.all(rootDirs.map(async dir => {
     try {
       const moduleDirs = await goExec.getModuleDir("all", dir);
-      return { baseDir: dir, moduleDirs: moduleDirs, error: undefined };
+      const filtered = moduleDirs.filter(moduleDir => {
+        const inRootDir = rootDirs.some(rd => {
+          return moduleDir.startsWith(rd);
+        });
+        return !inRootDir;
+      });
+      return { baseDir: dir, moduleDirs: filtered, error: undefined };
     } catch (err) {
       return { baseDir: dir, moduleDirs: [], error: err };
     }

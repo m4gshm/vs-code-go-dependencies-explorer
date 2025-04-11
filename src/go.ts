@@ -2,6 +2,7 @@ import cp from 'child_process';
 import { Uri } from 'vscode';
 import { URL } from 'url';
 import * as util from 'util';
+import { normalizeWinPath } from './dir';
 
 export type WorkDir = string | URL | undefined;
 
@@ -50,7 +51,7 @@ export class GoExec {
         return rawJson;
     }
 
-    public async getModuleDir(moduleName: string | undefined = undefined, workDir: string, excludeWorkDir = true) {
+    public async getModuleDir(moduleName: string | undefined = undefined, workDir: string) {
         const args = ['list', '-f', '{{.Dir}}', '-m', '-e'];
         if (moduleName) {
             args.push(moduleName);
@@ -61,10 +62,7 @@ export class GoExec {
             throw this.newError(args, err);
         }
         const out = result.out;
-        const dir = out.split('\n').filter(dir => dir.length > 0);
-        if (workDir && excludeWorkDir) {
-            return dir.filter(dir => !dir.startsWith(workDir));
-        }
+        const dir = out.split('\n').filter(dir => dir.length > 0).map(dir => normalizeWinPath(dir));
         return dir;
     }
 

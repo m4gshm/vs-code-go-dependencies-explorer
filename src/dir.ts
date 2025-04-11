@@ -25,12 +25,17 @@ export class DirHierarchyBuilder {
     public static create(dirPaths: string[], expectedRootDir: string, expectedRootDirReplace: string, expectedRootName: string) {
         let root = DirHierarchyBuilder.newHierarchyBuilder(expectedRootDir, expectedRootDir, expectedRootDirReplace, expectedRootName);
         for (let dirPath of dirPaths) {
-            let newRoot = DirHierarchyBuilder.newHierarchyBuilder(dirPath, expectedRootDir, expectedRootDirReplace, expectedRootName);
-            if (root) {
-                if (newRoot && root.path === newRoot.path) {
-                    root.merge(newRoot);
-                } else { 
-                    //log
+            if (!dirPath.startsWith(expectedRootDir)) {
+                // throw new Error(`path "${dirPath}" must be start from "${expectedRootDir}"`);
+                console.warn(`path "${dirPath}" must be start from "${expectedRootDir}"`);
+            } else {
+                let newRoot = DirHierarchyBuilder.newHierarchyBuilder(dirPath, expectedRootDir, expectedRootDirReplace, expectedRootName);
+                if (newRoot && root) {
+                    if (root.path === newRoot.path) {
+                        root.merge(newRoot);
+                    } else {
+                        //log
+                    }
                 }
             }
         }
@@ -40,9 +45,6 @@ export class DirHierarchyBuilder {
 
     static newHierarchyBuilder(dirPath: string, expectedRootDir: string, expectedRootDirReplace: string, expectedRootName: string) {
         dirPath = normalizeWinPath(dirPath);
-        if (!dirPath.startsWith(expectedRootDir)) {
-            throw new Error(`path "${dirPath}" must be start from "${expectedRootDir}"`);
-        }
         const expectedRootPathReplace = Uri.file(expectedRootDirReplace).fsPath;
         let dirPathPart = dirPath.substring(expectedRootDir.length, dirPath.length);
         let root: DirHierarchyBuilder | undefined;
