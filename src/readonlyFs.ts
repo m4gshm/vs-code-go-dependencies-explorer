@@ -102,7 +102,12 @@ export class FsUriConverter {
                 return subDir.path;
             }));
 
-            this.extPackagesReplacedDirs = Array.from(replacedPrefixes);
+            const rootPath = e.rootReplaced?.path;
+            const extPackagesReplacedDirs = Array.from(replacedPrefixes);
+            if (rootPath) {
+                extPackagesReplacedDirs.push(rootPath);
+            }
+            this.extPackagesReplacedDirs = extPackagesReplacedDirs;
             //log
         });
     }
@@ -143,7 +148,7 @@ export class FsUriConverter {
                 if (pathPrefix) {
                     const matched = fsPath.startsWith(pathPrefix);
                     if (matched) {
-                        return root; //{ code: root.code, codePath: root.codePath, pathPrefix: pathPrefix };
+                        return root;
                     }
                 }
                 return undefined;

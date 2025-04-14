@@ -20,6 +20,11 @@ export function flat(dirs: Directory[]) {
     }));
 }
 
+
+interface M extends Map<string, M> {
+
+}
+
 export class DirHierarchyBuilder {
 
     constructor(
@@ -32,9 +37,9 @@ export class DirHierarchyBuilder {
     }
 
     public static createGrouped(groupedByRootDirs: Map<string, string[]>, rootPath: string, rootName: string) {
-        const subdirs = new Map(Array.from(groupedByRootDirs.entries()).map(([root, subDirs]) => {
+        const subdirs = new Map(Array.from(groupedByRootDirs.entries()).map(([root, dirPaths]) => {
             const fullRoot = root;//path.join(fsRootPath, root);
-            const subDirHierarhies = new Map(subDirs.map(subDir => {
+            const subDirHierarhies = new Map(dirPaths.map(subDir => {
                 return [subDir, new DirHierarchyBuilder(false, subDir, path.join(fullRoot, subDir), new Map(), true)];
             }));
             return [fullRoot, (new DirHierarchyBuilder(false, fullRoot, fullRoot, subDirHierarhies, false))];
@@ -42,30 +47,49 @@ export class DirHierarchyBuilder {
         return subdirs.size > 0 ? new DirHierarchyBuilder(true, rootName, rootPath, subdirs, false) : undefined;
     }
 
-    public static create(dirPaths: string[], expectedRootDir: string, expectedRootDirReplace: string, expectedRootName: string) {
-        let root = DirHierarchyBuilder.newHierarchyBuilder(expectedRootDir, expectedRootDir, expectedRootDirReplace, expectedRootName);
+    public static create(
+        dirPaths: string[],
+        expectedRootDir: string | undefined = undefined,
+        expectedRootDirReplace: string | undefined = undefined,
+        expectedRootName: string | undefined = undefined,
+        collapseFirst: boolean = false,
+    ) {
+        let root = expectedRootDir ? DirHierarchyBuilder.newHierarchyBuilder(
+            expectedRootDir, expectedRootDir, expectedRootDirReplace, expectedRootName
+        ) : undefined;
         for (let dirPath of dirPaths) {
-            if (!dirPath.startsWith(expectedRootDir)) {
+            if (expectedRootDir && !dirPath.startsWith(expectedRootDir)) {
                 console.warn(`path "${dirPath}" must be start from "${expectedRootDir}"`);
             } else {
-                let newRoot = DirHierarchyBuilder.newHierarchyBuilder(dirPath, expectedRootDir, expectedRootDirReplace, expectedRootName);
-                if (newRoot && root) {
-                    if (root.path === newRoot.path) {
-                        root.merge(newRoot);
-                    } else {
-                        //log
+                let newRoot = DirHierarchyBuilder.newHierarchyBuilder(dirPath, expectedRootDir,
+                    expectedRootDirReplace, expectedRootName
+                );
+                if (!root) {
+                    root = newRoot;
+                } else
+                    if (newRoot && root) {
+                        if (root.path === newRoot.path) {
+                            root.merge(newRoot);
+                        } else {
+                            //log
+                        }
                     }
-                }
             }
         }
-        const [_, collapsedRoot] = collapse(expectedRootDir, root);
-        return collapsedRoot;
+        if (root) {
+            const [_, collapsedRoot] = collapse(expectedRootDir ? expectedRootDir : '', root, collapseFirst);
+            return collapsedRoot;
+        } else {
+            return undefined;
+        }
     }
 
-    static newHierarchyBuilder(dirPath: string, expectedRootDir: string, expectedRootDirReplace: string, expectedRootName: string) {
+    static newHierarchyBuilder(dirPath: string, expectedRootDir: string | undefined = undefined,
+        expectedRootDirReplace: string | undefined = undefined, expectedRootName: string | undefined = undefined) {
         dirPath = normalizeWinPath(dirPath);
-        const expectedRootPathReplace = Uri.file(expectedRootDirReplace).fsPath;
-        let dirPathPart = dirPath.substring(expectedRootDir.length, dirPath.length);
+        const withExpectedRootDirReplace = expectedRootDirReplace && expectedRootDirReplace.length > 0;
+        const expectedRootPathReplace = withExpectedRootDirReplace ? Uri.file(expectedRootDirReplace).fsPath : "";
+        let dirPathPart = expectedRootDir ? dirPath.substring(expectedRootDir.length, dirPath.length) : dirPath;
         let root: DirHierarchyBuilder | undefined;
         let findFiles = true;
         for (; dirPathPart.length > 0;) {
@@ -75,8 +99,9 @@ export class DirHierarchyBuilder {
             if (name.length === 0) {
                 break;
             }
-            const path = join(expectedRootPathReplace, join(parentParentDir, name));
-            const newRoot = new DirHierarchyBuilder(false, name, path, new Map(), findFiles);
+            const path = join(parentParentDir, name);
+            const fullPath = withExpectedRootDirReplace ? join(expectedRootPathReplace, path) : path;
+            const newRoot = new DirHierarchyBuilder(false, name, fullPath, new Map(), findFiles);
             if (root) {
                 newRoot.subdirs.set(root.name, root);
             }
@@ -86,15 +111,13 @@ export class DirHierarchyBuilder {
         }
 
         const sub = root;
-        root = new DirHierarchyBuilder(true, expectedRootName, expectedRootPathReplace, new Map());
+        const rootPath = expectedRootPathReplace.length > 0 ? expectedRootPathReplace : dirPathPart;
+        const rootName = expectedRootName && expectedRootName.length > 0 ? expectedRootName : dirPathPart;
+        root = new DirHierarchyBuilder(true, rootName, rootPath, new Map());
         if (sub) {
             root.subdirs.set(sub.name, sub);
         }
         return root;
-    }
-
-    public get isGoPackage(): boolean {
-        return true;
     }
 
     merge(other: DirHierarchyBuilder) {
@@ -126,28 +149,17 @@ export function normalizeWinPath(dirPath: string) {
     return dirPath;
 }
 
-function collapseAll(roots: Map<string, DirHierarchyBuilder>) {
-    return new Map(Array.from(roots.entries()).map(([fullPath, dir]) => {
-        return collapse(fullPath, dir);
-    }));
-}
-
-function collapse(name: string, dir: DirHierarchyBuilder): [string, DirHierarchyBuilder] {
+function collapse(name: string, dir: DirHierarchyBuilder, collapseSelf: boolean = false): [string, DirHierarchyBuilder] {
     const subdirs = dir.subdirs;
-    const collapsedSubdirs = collapseAll(subdirs);
-
-    const root = dir.root;
-    const isGoPackage = dir.isGoPackage;
-    const single = collapsedSubdirs.size === 1;
-    if (!root && !isGoPackage && single) {
-        const [subdirName, subdir] = collapsedSubdirs.entries().next().value!!;
-        const collapsedPath = dir.path ? join(dir.path, subdirName) : subdirName;
-        subdir.path = collapsedPath;
-        subdir.root = dir.root;
-        return [collapsedPath, subdir];
+    const single = subdirs.size === 1;
+    if (!(collapseSelf && single)) {
+        return [name, dir];
     }
-
-    dir.subdirs = collapsedSubdirs;
-    return [name, dir];
+    const [subdirName, subdir] = subdirs.entries().next().value!!;
+    const [collapsedSubdirName, collapsedSubdir] = collapse(subdirName, subdir, true);
+    const collapsedSubPath = dir.name ? join(dir.name, collapsedSubdirName) : collapsedSubdirName;
+    collapsedSubdir.root = dir.root;
+    collapsedSubdir.name = collapsedSubPath;
+    return [collapsedSubPath, collapsedSubdir];
 }
 
