@@ -1,4 +1,4 @@
-import { parse, join } from 'path';
+import path, { parse, join } from 'path';
 import { Uri } from 'vscode';
 
 export class Directory {
@@ -22,11 +22,31 @@ export function flat(dirs: Directory[]) {
 
 export class DirHierarchyBuilder {
 
+    constructor(
+        public root: boolean,
+        public name: string,
+        public path: string,
+        public subdirs: Map<string, DirHierarchyBuilder>,
+        public findFiles: boolean = false,
+    ) {
+    }
+
+    public static createGrouped(groupedByRootDirs: Map<string, string[]>, rootPath: string, rootName: string) {
+        const fsRootPath = Uri.file(rootPath).fsPath;
+        const subdirs = new Map(Array.from(groupedByRootDirs.entries()).map(([root, subDirs]) => {
+            const fullRoot = root;//path.join(fsRootPath, root);
+            const subDirHierarhies = new Map(subDirs.map(subDir => {
+                return [subDir, new DirHierarchyBuilder(false, subDir, path.join(fullRoot, subDir), new Map(), true)];
+            }));
+            return [fullRoot, (new DirHierarchyBuilder(false, fullRoot, fullRoot, subDirHierarhies, false))];
+        }));
+        return new DirHierarchyBuilder(true, rootName, rootPath, subdirs, false);
+    }
+
     public static create(dirPaths: string[], expectedRootDir: string, expectedRootDirReplace: string, expectedRootName: string) {
         let root = DirHierarchyBuilder.newHierarchyBuilder(expectedRootDir, expectedRootDir, expectedRootDirReplace, expectedRootName);
         for (let dirPath of dirPaths) {
             if (!dirPath.startsWith(expectedRootDir)) {
-                // throw new Error(`path "${dirPath}" must be start from "${expectedRootDir}"`);
                 console.warn(`path "${dirPath}" must be start from "${expectedRootDir}"`);
             } else {
                 let newRoot = DirHierarchyBuilder.newHierarchyBuilder(dirPath, expectedRootDir, expectedRootDirReplace, expectedRootName);
@@ -76,15 +96,6 @@ export class DirHierarchyBuilder {
 
     public get isGoPackage(): boolean {
         return true;
-    }
-
-    constructor(
-        public root: boolean,
-        public name: string,
-        public path: string,
-        public subdirs: Map<string, DirHierarchyBuilder>,
-        public findFiles: boolean = false,
-    ) {
     }
 
     merge(other: DirHierarchyBuilder) {

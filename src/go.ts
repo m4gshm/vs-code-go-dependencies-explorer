@@ -51,8 +51,10 @@ export class GoExec {
         return rawJson;
     }
 
-    public async getModuleDir(moduleName: string | undefined = undefined, workDir: string) {
-        const args = ['list', '-f', '{{.Dir}}', '-m', '-e'];
+    public async getModules(moduleName: string | undefined = undefined, workDir: string) {
+        const delim = '=>'; 
+        const replaced = 'replaced';
+        const args = ['list', '-f', '{{.Path}}' + delim + '{{.Dir}}' + delim + '{{if not (eq .Replace nil)}}' + replaced + '{{end}}', '-m', '-e'];
         if (moduleName) {
             args.push(moduleName);
         }
@@ -62,8 +64,14 @@ export class GoExec {
             throw this.newError(args, err);
         }
         const out = result.out;
-        const dir = out.split('\n').filter(dir => dir.length > 0).map(dir => normalizeWinPath(dir));
-        return dir;
+        const modules = out.split('\n').map(pair => {
+            const parts = pair.split(delim);
+            const path = parts[0];
+            const dir = parts[1];
+            const replaced = parts[2];
+            return { dir: normalizeWinPath(dir), path: path, replaced: replaced === "replaced" };
+        }).filter(module => module.dir.length > 0);
+        return modules;
     }
 
     private async execGo(args: string[], workDir: WorkDir = undefined) {

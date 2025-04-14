@@ -1,17 +1,12 @@
-import * as fs from 'fs';
-import { Directory, DirHierarchyBuilder, flat, normalizeWinPath } from './dir';
-import path, { parse, join } from 'path';
+import { Directory, normalizeWinPath } from './dir';
+import { parse, join } from 'path';
 import { GoExec } from './go';
-import { promisify } from 'util';
-import { FsUriConverter, ROOT_EXT_PACK, ROOT_STD_LIB, SCHEME } from './readonlyFs';
+import { FsUriConverter, SCHEME } from './readonlyFs';
 import {
   commands, EventEmitter, FileSystem, FileType, GlobPattern, Tab, TabInputText, Disposable,
   TreeDataProvider, TreeItem, TreeItemCollapsibleState, TreeView, Uri, window, workspace
 } from 'vscode';
-import { SHARE_ENV } from 'worker_threads';
-
-export const GO_MOD_PATTERN = '**/go.mod';
-export const GO_SUM_PATTERN = '**/go.sum';
+import { getGoModulesPackageDirs, getGoStdLibPackageDirs, GoPackageDirs } from './goPackageDirs';
 
 export class GoDependenciesTreeProvider implements TreeDataProvider<TreeItem> {
   private readonly subscriptions: Disposable[] = [];
@@ -21,18 +16,15 @@ export class GoDependenciesTreeProvider implements TreeDataProvider<TreeItem> {
   private readonly uriConv: FsUriConverter;
   private readonly extPackagesDir: string;
 
-  private treeVisible = false;
-
   private readonly stdLibDirs: Map<string, GoDirItem>;
   private readonly stdLibRootDir: GoDirItem;
   private modulesRootDir!: GoDirItem;
   private modulesDirs: Map<string, GoDirItem> = new Map();
+  private replacedRootDir!: GoDirItem | undefined;
+  private replacedDirs: Map<string, GoDirItem> = new Map();
 
-  static async setup(fs: FileSystem, uriConv: FsUriConverter,
-    goExec: GoExec, stdLibDir: string, extPackagesDir: string
-  ) {
+  static async setup(fs: FileSystem, uriConv: FsUriConverter, goExec: GoExec, stdLibDir: string, extPackagesDir: string, modules: GoPackageDirs) {
     const std = await getGoStdLibPackageDirs(stdLibDir);
-    const modules = await getGoModulesPackageDirs(extPackagesDir, goExec);
     return new this(fs, uriConv, goExec, std, modules, extPackagesDir);
   }
 
@@ -143,6 +135,8 @@ export class GoDependenciesTreeProvider implements TreeDataProvider<TreeItem> {
   private initModulesDir(modules: GoPackageDirs) {
     this.modulesRootDir = newGoDirItem(modules.root);
     this.modulesDirs = convertToGoDirs(modules.flatDirs);
+    this.replacedRootDir = modules.rootReplaced ? newGoDirItem(modules.rootReplaced) : undefined;
+    this.replacedDirs = convertToGoDirs(modules.flatReplaced);
   }
 
   private syncActiveTabWithTree() {
@@ -178,7 +172,7 @@ export class GoDependenciesTreeProvider implements TreeDataProvider<TreeItem> {
   }
 
   private isPackageDir(dir: string): boolean {
-    return this.stdLibDirs.has(dir) || this.modulesDirs.has(dir);
+    return this.stdLibDirs.has(dir) || this.modulesDirs.has(dir) || this.replacedDirs.has(dir);
   }
 
   getTreeItem(element: TreeItem): TreeItem {
@@ -208,10 +202,14 @@ export class GoDependenciesTreeProvider implements TreeDataProvider<TreeItem> {
       element.children = children;
       return Promise.resolve(children);
     } else if (!element) {
-      const roots = [this.stdLibRootDir];
+      const roots: GoDirItem[] = [this.stdLibRootDir];
       const modules = this.modulesRootDir;
       if (modules) {
         roots.push(modules);
+      }
+      const replaced = this.replacedRootDir;
+      if (replaced) {
+        roots.push(replaced);
       }
       return Promise.resolve(roots);
     } else {
@@ -244,7 +242,7 @@ export class GoDependenciesTreeProvider implements TreeDataProvider<TreeItem> {
   readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
   private getGoDirItem(nextLevelPath: string): GoDirItem | undefined {
-    return this.stdLibDirs.get(nextLevelPath) || this.modulesDirs.get(nextLevelPath);
+    return this.stdLibDirs.get(nextLevelPath) || this.modulesDirs.get(nextLevelPath) || this.replacedDirs.get(nextLevelPath);
   }
 
   async refresh() {
@@ -266,10 +264,6 @@ function convertToGoDirs(flatDirs: Map<string, Directory>): Map<string, GoDirIte
   return new Map(Array.from(flatDirs.entries()).map(([fullPath, dir]) => [fullPath, newGoDirItem(dir)]));
 }
 
-async function getGoModuleDirs() {
-  return (await workspace.findFiles(GO_MOD_PATTERN)).map(f => parse(f.fsPath).dir).map(dir => normalizeWinPath(dir));
-}
-
 function dependencyUri(path: string) {
   return replaceUriScheme(SCHEME, Uri.file(path));
 }
@@ -287,64 +281,10 @@ function replaceUriScheme(newScheme: string, uri: Uri) {
   return uri;
 }
 
-async function getGoStdLibPackageDirs(stdLibDir: string): Promise<GoPackageDirs> {
-  console.debug(`retrieving Go package for standart library ${stdLibDir}`);
-
-  const stdGoPackageDirs = await getPackageDirs(stdLibDir);
-  const label = 'Standard library';
-  const root = DirHierarchyBuilder.create(stdGoPackageDirs, stdLibDir, ROOT_STD_LIB, label).toDirectory();
-  const flatDirs = flat([root]);
-
-  return { root: root, flatDirs: flatDirs };
-}
-
 export function getStdLibDir(env: any) {
   const goRoot = env['GOROOT'];
   const stdLibDir = normalizeWinPath(join(`${goRoot}`, 'src'));
   return stdLibDir;
-}
-
-async function getGoModulesPackageDirs(extPackagesDir: string, goExec: GoExec): Promise<GoPackageDirs> {
-
-  const rootDirs = await getGoModuleDirs();
-  console.debug(`retrieving Go module directories ${rootDirs}`);
-
-  const moduleDirs = Array.from(new Set((await Promise.all(rootDirs.map(async dir => {
-    try {
-      const moduleDirs = await goExec.getModuleDir("all", dir);
-      const filtered = moduleDirs.filter(moduleDir => {
-        const inRootDir = rootDirs.some(rd => {
-          return moduleDir.startsWith(rd);
-        });
-        return !inRootDir;
-      });
-      return { baseDir: dir, moduleDirs: filtered, error: undefined };
-    } catch (err) {
-      return { baseDir: dir, moduleDirs: [], error: err };
-    }
-  }))).flatMap(d => d)));
-
-  moduleDirs.filter(md => md.error !== undefined).forEach(md => {
-    const err = md.error;
-    if (err) {
-      const moduelDir = md.baseDir;
-      const message = err instanceof Error ? err.message : `${err}`;
-      const errMessage = `Module error: '${moduelDir}', ${message}`;
-      console.info(errMessage);
-      // window.showErrorMessage(errMessage);
-    }
-  });
-
-  const allModuleDirs = Array.from(new Set(moduleDirs.flatMap(md => md.moduleDirs)));
-  console.debug(`retrieving Go package dirs for module dirs ${allModuleDirs}`);
-
-  const modulePackageDirs = (await Promise.all(allModuleDirs.map(async d => await getPackageDirs(d)))).flatMap(dd => dd);
-
-  const name = 'External packages';
-  const root = DirHierarchyBuilder.create(modulePackageDirs, extPackagesDir, ROOT_EXT_PACK, name).toDirectory();
-  const flatDirs = flat([root]);
-
-  return { root: root, flatDirs: flatDirs };
 }
 
 export async function getExtPackagesDir(goExec: GoExec) {
@@ -354,29 +294,6 @@ export async function getExtPackagesDir(goExec: GoExec) {
   return packagesDir;
 }
 
-async function getPackageDirs(dir: string) {
-  return Array.from(new Set(await listGoPackageDirs(dir)));
-}
-
-async function listGoPackageDirs(dirPath: string): Promise<string[]> {
-  const opendir = promisify(fs.opendir);
-  const dir = await opendir(dirPath);
-  const path = dir.path;
-  let isGoPackage = false;
-  let subPackages: string[] = [];
-  for await (let sub of dir) {
-    isGoPackage = isGoPackage || isGoFile(sub);
-    if (sub.isDirectory()) {
-      subPackages.push(...(await listGoPackageDirs(join(sub.parentPath, sub.name))));
-    }
-  }
-  const result = isGoPackage ? [path] : [];
-  return subPackages ? [...result, ...subPackages] : result;
-
-  function isGoFile(d: fs.Dirent) {
-    return d.isFile() && d.name.endsWith('.go');
-  }
-}
 
 class GoDirItem extends TreeItem {
   constructor(
@@ -402,9 +319,3 @@ class FileItem extends TreeItem {
     this.tooltip = fileName;
   }
 }
-
-interface GoPackageDirs {
-  root: Directory;
-  flatDirs: Map<string, Directory>;
-}
-
