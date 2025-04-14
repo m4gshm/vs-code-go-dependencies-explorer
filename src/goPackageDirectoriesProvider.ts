@@ -3,11 +3,44 @@ import { Directory, DirHierarchyBuilder, flat, normalizeWinPath } from './dir';
 import path, { parse, join } from 'path';
 import { GoExec } from './go';
 import { promisify } from 'util';
-import { ROOT_EXT_PACK, ROOT_EXT_PACK_REPLACED, ROOT_STD_LIB, SCHEME } from './readonlyFs';
-import { workspace} from 'vscode';
+import { ROOT_EXT_PACK, ROOT_EXT_PACK_REPLACED, ROOT_STD_LIB } from './readonlyFs';
+import { EventEmitter, workspace, Disposable } from 'vscode';
 
 export const GO_MOD_PATTERN = '**/go.mod';
 export const GO_SUM_PATTERN = '**/go.sum';
+
+
+export class GoPackageDirectoriesProvider implements Disposable {
+    constructor(
+        private readonly goExec: GoExec,
+        private readonly stdLibDir: string,
+        private readonly extPackagesDir: string
+    ) {
+
+    }
+
+    private readonly _onRequestPackages = new EventEmitter<GoPackageDirs>();
+    readonly onRequestPackages = this._onRequestPackages.event;
+
+    public dispose(): void {
+        this._onRequestPackages.dispose();
+    }
+
+    async getGoStdLib(): Promise<GoStdLibDirs> {
+        return await getGoStdLibPackageDirs(this.stdLibDir);
+    }
+
+    async getGoPackages(): Promise<GoPackageDirs> {
+        const packages = await getGoModulesPackageDirs(this.extPackagesDir, this.goExec);
+        this._onRequestPackages.fire(packages);
+        return packages;
+    }
+}
+
+export interface GoStdLibDirs {
+    root: Directory;
+    flatDirs: Map<string, Directory>;
+}
 
 export interface GoPackageDirs {
     root: Directory;
@@ -16,18 +49,18 @@ export interface GoPackageDirs {
     flatReplaced: Map<string, Directory>;
 }
 
-export async function getGoStdLibPackageDirs(stdLibDir: string): Promise<GoPackageDirs> {
-    console.debug(`retrieving Go package for standart library ${stdLibDir}`);
+async function getGoStdLibPackageDirs(stdLibDir: string): Promise<GoStdLibDirs> {
+    console.debug(`retrieving Go package for standard library ${stdLibDir}`);
 
     const stdGoPackageDirs = await getPackageDirs(stdLibDir);
     const label = 'Standard library';
     const root = DirHierarchyBuilder.create(stdGoPackageDirs, stdLibDir, ROOT_STD_LIB, label).toDirectory();
     const flatDirs = flat([root]);
 
-    return { root: root, flatDirs: flatDirs, rootReplaced: undefined, flatReplaced: new Map() };
+    return { root: root, flatDirs: flatDirs };
 }
 
-export async function getGoModulesPackageDirs(extPackagesDir: string, goExec: GoExec): Promise<GoPackageDirs> {
+async function getGoModulesPackageDirs(extPackagesDir: string, goExec: GoExec): Promise<GoPackageDirs> {
     const rootDirs = await getGoModuleDirs();
     console.debug(`retrieving Go module directories ${rootDirs}`);
 
@@ -78,9 +111,9 @@ export async function getGoModulesPackageDirs(extPackagesDir: string, goExec: Go
     const groupedByRoot = groupByRoot(replacedPackageDirs);
 
     const root = DirHierarchyBuilder.create(modulePackageDirs, extPackagesDir, ROOT_EXT_PACK, 'External packages').toDirectory();
-    const rootReplaced = DirHierarchyBuilder.createGrouped(groupedByRoot, ROOT_EXT_PACK_REPLACED, 'External packages (replaced)').toDirectory();
+    const rootReplaced = DirHierarchyBuilder.createGrouped(groupedByRoot, ROOT_EXT_PACK_REPLACED, 'External replaced')?.toDirectory();
     const flatDirs = flat([root]);
-    const flatDirsReplaced = flat([rootReplaced]);
+    const flatDirsReplaced = rootReplaced ? flat([rootReplaced]) : new Map<string, Directory>();
 
     return { root: root, flatDirs: flatDirs, rootReplaced: rootReplaced, flatReplaced: flatDirsReplaced };
 }

@@ -32,7 +32,6 @@ export class DirHierarchyBuilder {
     }
 
     public static createGrouped(groupedByRootDirs: Map<string, string[]>, rootPath: string, rootName: string) {
-        const fsRootPath = Uri.file(rootPath).fsPath;
         const subdirs = new Map(Array.from(groupedByRootDirs.entries()).map(([root, subDirs]) => {
             const fullRoot = root;//path.join(fsRootPath, root);
             const subDirHierarhies = new Map(subDirs.map(subDir => {
@@ -40,7 +39,7 @@ export class DirHierarchyBuilder {
             }));
             return [fullRoot, (new DirHierarchyBuilder(false, fullRoot, fullRoot, subDirHierarhies, false))];
         }));
-        return new DirHierarchyBuilder(true, rootName, rootPath, subdirs, false);
+        return subdirs.size > 0 ? new DirHierarchyBuilder(true, rootName, rootPath, subdirs, false) : undefined;
     }
 
     public static create(dirPaths: string[], expectedRootDir: string, expectedRootDirReplace: string, expectedRootName: string) {

@@ -6,15 +6,14 @@ import {
   commands, EventEmitter, FileSystem, FileType, GlobPattern, Tab, TabInputText, Disposable,
   TreeDataProvider, TreeItem, TreeItemCollapsibleState, TreeView, Uri, window, workspace
 } from 'vscode';
-import { getGoModulesPackageDirs, getGoStdLibPackageDirs, GoPackageDirs } from './goPackageDirs';
+import { GoPackageDirectoriesProvider, GoPackageDirs, GoStdLibDirs } from './goPackageDirectoriesProvider';
 
 export class GoDependenciesTreeProvider implements TreeDataProvider<TreeItem> {
   private readonly subscriptions: Disposable[] = [];
   private readonly treeView: TreeView<TreeItem>;
-  private readonly goExec: GoExec;
+  private readonly goPackDirProvider: GoPackageDirectoriesProvider;
   private readonly fs: FileSystem;
   private readonly uriConv: FsUriConverter;
-  private readonly extPackagesDir: string;
 
   private readonly stdLibDirs: Map<string, GoDirItem>;
   private readonly stdLibRootDir: GoDirItem;
@@ -23,20 +22,17 @@ export class GoDependenciesTreeProvider implements TreeDataProvider<TreeItem> {
   private replacedRootDir!: GoDirItem | undefined;
   private replacedDirs: Map<string, GoDirItem> = new Map();
 
-  static async setup(fs: FileSystem, uriConv: FsUriConverter, goExec: GoExec, stdLibDir: string, extPackagesDir: string, modules: GoPackageDirs) {
-    const std = await getGoStdLibPackageDirs(stdLibDir);
-    return new this(fs, uriConv, goExec, std, modules, extPackagesDir);
+  static async setup(fs: FileSystem, uriConv: FsUriConverter, goPackDirProvider: GoPackageDirectoriesProvider) {
+    return new this(fs, uriConv, await goPackDirProvider.getGoStdLib(), await goPackDirProvider.getGoPackages(), goPackDirProvider);
   }
 
-  private constructor(fs: FileSystem, uriConv: FsUriConverter,
-    goExec: GoExec, std: GoPackageDirs, modules: GoPackageDirs, extPackagesDir: string
-  ) {
+  private constructor(fs: FileSystem, uriConv: FsUriConverter, std: GoStdLibDirs, modules: GoPackageDirs, goPackDirProvider: GoPackageDirectoriesProvider) {
     this.fs = fs;
     this.uriConv = uriConv;
-    this.goExec = goExec;
+    this.goPackDirProvider = goPackDirProvider;
+    this.subscriptions.push(this.goPackDirProvider);
     this.stdLibRootDir = newGoDirItem(std.root);
     this.stdLibDirs = convertToGoDirs(std.flatDirs);
-    this.extPackagesDir = extPackagesDir;
     this.initModulesDir(modules);
     this.treeView = window.createTreeView("go.dependencies.explorer", {
       showCollapseAll: true, treeDataProvider: this,
@@ -159,7 +155,7 @@ export class GoDependenciesTreeProvider implements TreeDataProvider<TreeItem> {
           const dir = filePath.dir;
           if (this.isPackageDir(dir)) {
             commands.executeCommand("workbench.action.files.setActiveEditorReadonlyInSession");
-            const openPath = depUri.fsPath;//this.uriConv.toFsUri(fileUri).fsPath;
+            const openPath = depUri.fsPath;
             this.treeView?.reveal({
               id: openPath,
               focus: true,
@@ -246,7 +242,7 @@ export class GoDependenciesTreeProvider implements TreeDataProvider<TreeItem> {
   }
 
   async refresh() {
-    this.initModulesDir(await getGoModulesPackageDirs(this.extPackagesDir, this.goExec));
+    this.initModulesDir(await this.goPackDirProvider.getGoPackages());
     this._onDidChangeTreeData.fire(undefined);
   }
 
