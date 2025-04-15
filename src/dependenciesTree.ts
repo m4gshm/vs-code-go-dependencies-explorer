@@ -1,4 +1,4 @@
-import { Directory, normalizeWinPath } from './dir';
+import { Directory, normalizeWinPath } from './directory';
 import { parse, join } from 'path';
 import { GoExec } from './go';
 import { FsUriConverter, SCHEME } from './readonlyFs';

@@ -2,7 +2,7 @@ import cp from 'child_process';
 import { Uri } from 'vscode';
 import { URL } from 'url';
 import * as util from 'util';
-import { normalizeWinPath } from './dir';
+import { normalizeWinPath } from './directory';
 
 export type WorkDir = string | URL | undefined;
 

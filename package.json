@@ -113,7 +113,7 @@
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
-    "test": "node --test",
+    "test": "vscode-test",
     "vscode-test": "vscode-test"
   },
   "devDependencies": {
@@ -125,7 +125,7 @@
     "@typescript-eslint/eslint-plugin": "^8.17.0",
     "@typescript-eslint/parser": "^8.17.0",
     "@vscode/test-cli": "^0.0.10",
-    "@vscode/test-electron": "^2.4.1",
+    "@vscode/test-electron": "^2.5.2",
     "@vscode/vsce": "^3.2.2",
     "esbuild": ">=0.25.0",
     "eslint": "^9.16.0",

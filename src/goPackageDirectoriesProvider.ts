@@ -1,5 +1,5 @@
 import * as fs from 'fs';
-import { Directory, DirHierarchyBuilder, flat, normalizeWinPath } from './dir';
+import { Directory, DirectoryHierarchyBuilder, flat, normalizeWinPath } from './directory';
 import path, { parse, join } from 'path';
 import { GoExec } from './go';
 import { promisify } from 'util';
@@ -54,7 +54,7 @@ async function getGoStdLibPackageDirs(stdLibDir: string): Promise<GoStdLibDirs> 
 
     const stdGoPackageDirs = await getPackageDirs(stdLibDir);
     const label = 'Standard library';
-    const root = DirHierarchyBuilder.create(stdGoPackageDirs, stdLibDir, ROOT_STD_LIB, label)!!.toDirectory();
+    const root = DirectoryHierarchyBuilder.create(stdGoPackageDirs, stdLibDir, ROOT_STD_LIB, label)!!.toDirectory();
     const flatDirs = flat([root]);
 
     return { root: root, flatDirs: flatDirs };
@@ -108,8 +108,8 @@ async function getGoModulesPackageDirs(extPackagesDir: string, goExec: GoExec): 
     console.debug(`retrieving Go replaced package dirs for module dirs ${replacedDirs}`);
     const replacedPackageDirs = (await Promise.all(replacedDirs.map(async d => await getPackageDirs(d)))).flatMap(dd => dd);
 
-    const root = DirHierarchyBuilder.create(modulePackageDirs, extPackagesDir, ROOT_EXT_PACK, 'External packages')!!.toDirectory();
-    const rootReplaced = DirHierarchyBuilder.create(replacedPackageDirs, undefined, undefined, undefined, true)?.toDirectory();
+    const root = DirectoryHierarchyBuilder.create(modulePackageDirs, extPackagesDir, ROOT_EXT_PACK, 'External packages')!!.toDirectory();
+    const rootReplaced = DirectoryHierarchyBuilder.create(replacedPackageDirs, undefined, undefined, undefined, true)?.toDirectory();
     const flatDirs = flat([root]);
     const flatDirsReplaced = rootReplaced ? flat([rootReplaced]) : new Map<string, Directory>();
 

@@ -20,18 +20,13 @@ export function flat(dirs: Directory[]) {
     }));
 }
 
-
-interface M extends Map<string, M> {
-
-}
-
-export class DirHierarchyBuilder {
+export class DirectoryHierarchyBuilder {
 
     constructor(
         public root: boolean,
         public name: string,
         public path: string,
-        public subdirs: Map<string, DirHierarchyBuilder>,
+        public subdirs: Map<string, DirectoryHierarchyBuilder>,
         public findFiles: boolean = false,
     ) {
     }
@@ -40,11 +35,11 @@ export class DirHierarchyBuilder {
         const subdirs = new Map(Array.from(groupedByRootDirs.entries()).map(([root, dirPaths]) => {
             const fullRoot = root;//path.join(fsRootPath, root);
             const subDirHierarhies = new Map(dirPaths.map(subDir => {
-                return [subDir, new DirHierarchyBuilder(false, subDir, path.join(fullRoot, subDir), new Map(), true)];
+                return [subDir, new DirectoryHierarchyBuilder(false, subDir, path.join(fullRoot, subDir), new Map(), true)];
             }));
-            return [fullRoot, (new DirHierarchyBuilder(false, fullRoot, fullRoot, subDirHierarhies, false))];
+            return [fullRoot, (new DirectoryHierarchyBuilder(false, fullRoot, fullRoot, subDirHierarhies, false))];
         }));
-        return subdirs.size > 0 ? new DirHierarchyBuilder(true, rootName, rootPath, subdirs, false) : undefined;
+        return subdirs.size > 0 ? new DirectoryHierarchyBuilder(true, rootName, rootPath, subdirs, false) : undefined;
     }
 
     public static create(
@@ -54,14 +49,14 @@ export class DirHierarchyBuilder {
         expectedRootName: string | undefined = undefined,
         collapseFirst: boolean = false,
     ) {
-        let root = expectedRootDir ? DirHierarchyBuilder.newHierarchyBuilder(
+        let root = expectedRootDir ? DirectoryHierarchyBuilder.newHierarchyBuilder(
             expectedRootDir, expectedRootDir, expectedRootDirReplace, expectedRootName
         ) : undefined;
         for (let dirPath of dirPaths) {
             if (expectedRootDir && !dirPath.startsWith(expectedRootDir)) {
                 console.warn(`path "${dirPath}" must be start from "${expectedRootDir}"`);
             } else {
-                let newRoot = DirHierarchyBuilder.newHierarchyBuilder(dirPath, expectedRootDir,
+                let newRoot = DirectoryHierarchyBuilder.newHierarchyBuilder(dirPath, expectedRootDir,
                     expectedRootDirReplace, expectedRootName
                 );
                 if (!root) {
@@ -90,7 +85,7 @@ export class DirHierarchyBuilder {
         const withExpectedRootDirReplace = expectedRootDirReplace && expectedRootDirReplace.length > 0;
         const expectedRootPathReplace = withExpectedRootDirReplace ? Uri.file(expectedRootDirReplace).fsPath : "";
         let dirPathPart = expectedRootDir ? dirPath.substring(expectedRootDir.length, dirPath.length) : dirPath;
-        let root: DirHierarchyBuilder | undefined;
+        let root: DirectoryHierarchyBuilder | undefined;
         let findFiles = true;
         for (; dirPathPart.length > 0;) {
             const parsed = parse(dirPathPart);
@@ -101,7 +96,7 @@ export class DirHierarchyBuilder {
             }
             const path = join(parentParentDir, name);
             const fullPath = withExpectedRootDirReplace ? join(expectedRootPathReplace, path) : path;
-            const newRoot = new DirHierarchyBuilder(false, name, fullPath, new Map(), findFiles);
+            const newRoot = new DirectoryHierarchyBuilder(false, name, fullPath, new Map(), findFiles);
             if (root) {
                 newRoot.subdirs.set(root.name, root);
             }
@@ -113,14 +108,14 @@ export class DirHierarchyBuilder {
         const sub = root;
         const rootPath = expectedRootPathReplace.length > 0 ? expectedRootPathReplace : dirPathPart;
         const rootName = expectedRootName && expectedRootName.length > 0 ? expectedRootName : dirPathPart;
-        root = new DirHierarchyBuilder(true, rootName, rootPath, new Map());
+        root = new DirectoryHierarchyBuilder(true, rootName, rootPath, new Map());
         if (sub) {
             root.subdirs.set(sub.name, sub);
         }
         return root;
     }
 
-    merge(other: DirHierarchyBuilder) {
+    merge(other: DirectoryHierarchyBuilder) {
         other.subdirs.forEach((otherSubdir, name) => {
             let subdir = this.subdirs.get(name);
             if (!subdir) {
@@ -149,7 +144,7 @@ export function normalizeWinPath(dirPath: string) {
     return dirPath;
 }
 
-function collapse(name: string, dir: DirHierarchyBuilder, collapseSelf: boolean = false): [string, DirHierarchyBuilder] {
+function collapse(name: string, dir: DirectoryHierarchyBuilder, collapseSelf: boolean = false): [string, DirectoryHierarchyBuilder] {
     const subdirs = dir.subdirs;
     const single = subdirs.size === 1;
     if (!(collapseSelf && single)) {
