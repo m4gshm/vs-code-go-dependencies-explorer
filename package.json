@@ -111,24 +111,21 @@
     "compile": "tsc -p ./",
     "bundle": "node esbuild.js",
     "watch": "tsc -watch -p ./",
-    "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
-    "test": "vscode-test",
-    "vscode-test": "vscode-test"
+    "test": "node --test test/**/*.test.ts",
+    "build":"compile test lint"
   },
   "devDependencies": {
-    "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
     "@types/semver": "^7.5.8",
     "@types/vscode": "^1.96.0",
     "@types/wu": "^2.1.44",
     "@typescript-eslint/eslint-plugin": "^8.17.0",
     "@typescript-eslint/parser": "^8.17.0",
-    "@vscode/test-cli": "^0.0.10",
-    "@vscode/test-electron": "^2.5.2",
     "@vscode/vsce": "^3.2.2",
     "esbuild": ">=0.25.0",
     "eslint": "^9.16.0",
+    "mocha": "^11.1.0",
     "rimraf": "^6.0.1",
     "typescript": "^5.7.2"
   },

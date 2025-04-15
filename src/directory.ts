@@ -1,5 +1,4 @@
 import path, { parse, join } from 'path';
-import { Uri } from 'vscode';
 
 export class Directory {
     constructor(
@@ -83,7 +82,7 @@ export class DirectoryHierarchyBuilder {
         expectedRootDirReplace: string | undefined = undefined, expectedRootName: string | undefined = undefined) {
         dirPath = normalizeWinPath(dirPath);
         const withExpectedRootDirReplace = expectedRootDirReplace && expectedRootDirReplace.length > 0;
-        const expectedRootPathReplace = withExpectedRootDirReplace ? Uri.file(expectedRootDirReplace).fsPath : "";
+        const expectedRootPathReplace = withExpectedRootDirReplace ? asRoot(expectedRootDirReplace) : "";
         let dirPathPart = expectedRootDir ? dirPath.substring(expectedRootDir.length, dirPath.length) : dirPath;
         let root: DirectoryHierarchyBuilder | undefined;
         let findFiles = true;
@@ -132,6 +131,12 @@ export class DirectoryHierarchyBuilder {
 }
 
 const isWin = process.platform === "win32";
+
+function asRoot(expectedRootDirReplace: string) {
+    return expectedRootDirReplace.startsWith(path.sep) 
+    ? expectedRootDirReplace 
+    : path.join(path.sep, expectedRootDirReplace);
+}
 
 export function normalizeWinPath(dirPath: string) {
     if (isWin) {

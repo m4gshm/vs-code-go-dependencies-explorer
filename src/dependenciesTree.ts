@@ -1,12 +1,13 @@
 import { Directory, normalizeWinPath } from './directory';
 import { parse, join } from 'path';
 import { GoExec } from './go';
-import { FsUriConverter, SCHEME } from './readonlyFs';
+import { FsUriConverter } from './goDependencyFS';
 import {
   commands, EventEmitter, FileSystem, FileType, GlobPattern, Tab, TabInputText, Disposable,
   TreeDataProvider, TreeItem, TreeItemCollapsibleState, TreeView, Uri, window, workspace
 } from 'vscode';
 import { GoPackageDirectoriesProvider, GoPackageDirs, GoStdLibDirs } from './goPackageDirectoriesProvider';
+import { SCHEME } from './goDependencyFSCommon';
 
 export class GoDependenciesTreeProvider implements TreeDataProvider<TreeItem> {
   private readonly subscriptions: Disposable[] = [];

@@ -3,8 +3,8 @@ import { Directory, DirectoryHierarchyBuilder, flat, normalizeWinPath } from './
 import path, { parse, join } from 'path';
 import { GoExec } from './go';
 import { promisify } from 'util';
-import { ROOT_EXT_PACK, ROOT_EXT_PACK_REPLACED, ROOT_STD_LIB } from './readonlyFs';
 import { EventEmitter, workspace, Disposable } from 'vscode';
+import { ROOT_STD_LIB, ROOT_EXT_PACK } from './goDependencyFSCommon';
 
 export const GO_MOD_PATTERN = '**/go.mod';
 export const GO_SUM_PATTERN = '**/go.sum';

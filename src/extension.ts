@@ -2,9 +2,10 @@ import * as vscode from 'vscode';
 import { getExtPackagesDir, getStdLibDir, GoDependenciesTreeProvider } from "./dependenciesTree";
 import { GoExec } from './go';
 import { GoExtensionAPI } from './goExtension';
-import { GoDepFileSystemProvider, newFsUriConverter as newFsUriConverter, SCHEME } from './readonlyFs';
+import { GoDepFileSystemProvider, newFsUriConverter as newFsUriConverter } from './goDependencyFS';
 import { GitExtension } from './gitExtension';
 import { GoPackageDirectoriesProvider } from './goPackageDirectoriesProvider';
+import { SCHEME } from './goDependencyFSCommon';
 
 export async function activate(context: vscode.ExtensionContext) {
     const goExtension = vscode.extensions.getExtension('golang.go');

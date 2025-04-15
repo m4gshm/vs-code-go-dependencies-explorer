@@ -5,11 +5,7 @@ import {
     Disposable
 } from 'vscode';
 import { GoPackageDirectoriesProvider } from './goPackageDirectoriesProvider';
-
-export const SCHEME = 'go-dep-file';
-export const ROOT_STD_LIB = 'StdLib';
-export const ROOT_EXT_PACK = 'ExtPack';
-export const ROOT_EXT_PACK_REPLACED = 'ExtPackReplaced';
+import { ROOT_EXT_PACK, ROOT_EXT_PACK_REPLACED, ROOT_STD_LIB, SCHEME } from './goDependencyFSCommon';
 
 export interface RootDir {
     code: string,
