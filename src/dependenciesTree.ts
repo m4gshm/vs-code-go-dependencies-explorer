@@ -8,6 +8,7 @@ import {
 } from 'vscode';
 import { GoPackageDirectoriesProvider, GoPackageDirs, GoStdLibDirs } from './goPackageDirectoriesProvider';
 import { SCHEME } from './goDependencyFSCommon';
+import { IFindInFilesArgs } from './search';
 
 export class GoDependenciesTreeProvider implements TreeDataProvider<TreeItem> {
   private readonly subscriptions: Disposable[] = [];
@@ -69,6 +70,33 @@ export class GoDependenciesTreeProvider implements TreeDataProvider<TreeItem> {
       }
     }));
 
+    const stdLibRootDir = this.stdLibRootDir;
+    const modulesRootDir = this.modulesRootDir;
+    const replacedRootDir = this.replacedRootDir;
+
+    this.subscriptions.push(commands.registerCommand('go.dependencies.search.in.all.directories', async item => {
+      const dirs = [stdLibRootDir, modulesRootDir, replacedRootDir]
+        .map(d => getFsUriOfSelectedItem(d, uriConv))
+        .filter(d => d !== undefined).map(uri => uri.fsPath)
+        .reduce((l, r) => l + "," + r);
+      await commands.executeCommand("workbench.action.findInFiles", {
+        filesToInclude: dirs,
+        triggerSearch: false,
+      } as IFindInFilesArgs);
+    }));
+
+
+    this.subscriptions.push(commands.registerCommand('go.dependencies.search.in.directory', async item => {
+      const uri = getFsUriOfSelectedItem(item, uriConv);
+      if (uri) {
+        await commands.executeCommand("workbench.action.findInFiles", {
+          filesToInclude: uri.fsPath,
+          triggerSearch: false,
+        } as IFindInFilesArgs);
+      }
+    }));
+
+
     this.subscriptions.push(commands.registerCommand('go.dependencies.copy.path', async item => {
       await execCommandOnItem('copyFilePath', item, this.uriConv);
     }));
@@ -91,26 +119,8 @@ export class GoDependenciesTreeProvider implements TreeDataProvider<TreeItem> {
       if (uri) {
         await commands.executeCommand(command, uri);
       }
-      function getFsUriOfSelectedItem(item: any, uriConv: FsUriConverter) {
-        let uri: Uri | undefined;
-        if (item instanceof FileItem) {
-          uri = dependencyUri(join(item.filePath, item.fileName));
-        } else if (item instanceof GoDirItem) {
-          const path = item.id;
-          if (path) {
-            uri = dependencyUri(path);
-          } else {
-            console.warn("undefined path of item: " + item);
-          }
-        } else {
-          console.warn("unexpected item type: " + item);
-        }
-        if (uri) {
-          uri = uriConv.toFsUri(uri);
-        }
-        return uri;
-      }
     }
+
     commands.executeCommand('setContext', 'go.dependencies.explorer.show', true);
   }
 
@@ -315,4 +325,25 @@ class FileItem extends TreeItem {
     this.resourceUri = dependencyUri(fillFilePath);
     this.tooltip = fileName;
   }
+}
+
+
+function getFsUriOfSelectedItem(item: any, uriConv: FsUriConverter) {
+  let uri: Uri | undefined;
+  if (item instanceof FileItem) {
+    uri = dependencyUri(join(item.filePath, item.fileName));
+  } else if (item instanceof GoDirItem) {
+    const path = item.id;
+    if (path) {
+      uri = dependencyUri(path);
+    } else {
+      console.warn("undefined path of item: " + item);
+    }
+  } else {
+    console.warn("unexpected item type: " + item);
+  }
+  if (uri) {
+    uri = uriConv.toFsUri(uri);
+  }
+  return uri;
 }

@@ -2,10 +2,12 @@ import path, { join } from 'path';
 import {
     EventEmitter, Event, FileChangeEvent, FileSystemProvider,
     FileType, FileSystem, Uri, FilePermission, FileSystemError,
-    Disposable
+    Disposable,
+    FileStat
 } from 'vscode';
 import { GoPackageDirectoriesProvider } from './goPackageDirectoriesProvider';
 import { ROOT_EXT_PACK, ROOT_EXT_PACK_REPLACED, ROOT_STD_LIB, SCHEME } from './goDependencyFSCommon';
+import { Directory } from './directory';
 
 export interface RootDir {
     code: string,
@@ -72,6 +74,11 @@ export function newFsUriConverter(stdLibDir: string, extPackagesDir: string, goP
     return new FsUriConverter(stdLibDir, extPackagesDir, goPackDirProvider);
 }
 
+function toFsPath(code: string): string {
+    return Uri.file(code).fsPath;
+}
+
+
 export class FsUriConverter {
     private readonly roots: {
         code: string,
@@ -81,15 +88,11 @@ export class FsUriConverter {
 
     private extPackagesReplacedDirs: string[];
 
-    private toFsPath(code: string): string {
-        return Uri.file(code).fsPath;
-    }
-
     constructor(stdLibDir: string, extPackagesDir: string, goPackDirProvider: GoPackageDirectoriesProvider) {
         this.roots = [
-            { code: ROOT_STD_LIB, codePath: this.toFsPath(ROOT_STD_LIB), pathPrefix: stdLibDir },
-            { code: ROOT_EXT_PACK, codePath: this.toFsPath(ROOT_EXT_PACK), pathPrefix: extPackagesDir },
-            { code: ROOT_EXT_PACK_REPLACED, codePath: this.toFsPath(ROOT_EXT_PACK_REPLACED), pathPrefix: "" },
+            { code: ROOT_STD_LIB, codePath: toFsPath(ROOT_STD_LIB), pathPrefix: stdLibDir },
+            { code: ROOT_EXT_PACK, codePath: toFsPath(ROOT_EXT_PACK), pathPrefix: extPackagesDir },
+            { code: ROOT_EXT_PACK_REPLACED, codePath: toFsPath(ROOT_EXT_PACK_REPLACED), pathPrefix: "" },
         ];
         this.extPackagesReplacedDirs = [];
 
