@@ -136,7 +136,7 @@
     "bundle": "node esbuild.js",
     "watch": "tsc -watch -p ./",
     "lint": "eslint src",
-    "test": "node --test test/**/*.test.ts",
+    "test": "node --test dist/test/**/*.test.js",
     "build": "npm run compile && npm run test && npm run lint"
   },
   "devDependencies": {

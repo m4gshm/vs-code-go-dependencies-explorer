@@ -155,7 +155,7 @@ function collapse(name: string, dir: DirectoryHierarchyBuilder, collapseSelf: bo
     if (!(collapseSelf && single)) {
         return [name, dir];
     }
-    const [subdirName, subdir] = subdirs.entries().next().value!!;
+    const [subdirName, subdir] = subdirs.entries().next().value!;
     const [collapsedSubdirName, collapsedSubdir] = collapse(subdirName, subdir, true);
     const collapsedSubPath = dir.name ? join(dir.name, collapsedSubdirName) : collapsedSubdirName;
     collapsedSubdir.root = dir.root;
