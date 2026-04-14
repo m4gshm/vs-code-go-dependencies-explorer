@@ -1,5 +1,4 @@
 import cp from 'child_process';
-import { Uri } from 'vscode';
 import { URL } from 'url';
 import * as util from 'util';
 import { normalizeWinPath } from './directory';
