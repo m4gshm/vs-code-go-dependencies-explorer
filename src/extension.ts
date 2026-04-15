@@ -1,58 +1,39 @@
 import * as vscode from 'vscode';
-import { getExtPackagesDir, getStdLibDir, GoDependenciesTreeProvider } from "./dependenciesTree";
+import { GoDependenciesTreeProvider } from "./dependenciesTree";
 import { GoExec } from './go';
-import { GoExtensionAPI } from './goExtension';
+import { getGoBinPath, getGoExtensionAPI, GoExtensionAPI } from './goExtension';
 import { GoDepFileSystemProvider, newFsUriConverter as newFsUriConverter } from './goDependencyFS';
 import { GitExtension } from './gitExtension';
 import { GoPackageDirectoriesProvider } from './goPackageDirectoriesProvider';
 import { SCHEME } from './goDependencyFSCommon';
+import { getExtPackagesDir, getStdLibDir } from './goEnv';
 
 var activated: boolean;
 
 export async function activate(context: vscode.ExtensionContext) {
-    const goExtensionApi = await getGoExtension();
+    const goExtensionApi = await getGoExtensionAPI();
     if (goExtensionApi) {
         await activateWithGo(goExtensionApi, context);
     } else {
         console.log('Waiting for Go extension to activate');
         context.subscriptions.push(vscode.extensions.onDidChange(async e => {
             if (!activated) {
-                const goExtensionApi = await getGoExtension();
+                const goExtensionApi = await getGoExtensionAPI();
                 if (goExtensionApi) {
                     await activateWithGo(goExtensionApi, context);
                 }
             }
         }));
     }
-}
-
-async function getGoExtension(): Promise<GoExtensionAPI | undefined> {
-    const extName = 'golang.go';
-    const goExtension = vscode.extensions.getExtension(extName);
-    if (!goExtension) {
-        console.log(`'${extName}' is not installed.`);
-        return undefined;
-    } else {
-        const isActive = goExtension.isActive;
-        const goExtensionApi: GoExtensionAPI | undefined = !isActive ? await goExtension.activate() : goExtension.exports;
-        if (!goExtensionApi) {
-            throw Error("'golang.go' desn't export API.");
-        }
-        return goExtensionApi;
-    }
+    return { context };
 }
 
 async function activateWithGo(goExtensionApi: GoExtensionAPI, context: vscode.ExtensionContext) {
-    const result = goExtensionApi.settings.getExecutionCommand('go');
-    const goPath = result?.binPath;
-    if (!goPath) {
-        throw Error("Cannot detect 'go' path.");
-    }
+    const goExec = new GoExec(getGoBinPath(goExtensionApi));
 
-    const goExec = new GoExec(goPath);
-
-    const stdLibDir = getStdLibDir(await goExec.getEnv());
-    const extPackagesDir = await getExtPackagesDir(goExec);
+    const env = await goExec.getEnv();
+    const stdLibDir = getStdLibDir(env);
+    const extPackagesDir = getExtPackagesDir(env);
 
     const rootConfig = 'go.dependencies.explorer';
     const conf = vscode.workspace.getConfiguration(rootConfig);

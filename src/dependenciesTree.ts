@@ -1,6 +1,5 @@
-import { Directory, normalizeWinPath } from './directory';
+import { Directory } from './directory';
 import { parse, join } from 'path';
-import { GoExec } from './go';
 import { FsUriConverter } from './goDependencyFS';
 import {
   commands, EventEmitter, FileSystem, FileType, GlobPattern, Tab, TabInputText, Disposable,
@@ -287,20 +286,6 @@ function replaceUriScheme(newScheme: string, uri: Uri) {
   }
   return uri;
 }
-
-export function getStdLibDir(env: any) {
-  const goRoot = env['GOROOT'];
-  const stdLibDir = normalizeWinPath(join(`${goRoot}`, 'src'));
-  return stdLibDir;
-}
-
-export async function getExtPackagesDir(goExec: GoExec) {
-  const env = await goExec.getEnv();
-  const goModCache = env['GOMODCACHE'];
-  const packagesDir = normalizeWinPath(`${goModCache}`);
-  return packagesDir;
-}
-
 
 class GoDirItem extends TreeItem {
   constructor(
