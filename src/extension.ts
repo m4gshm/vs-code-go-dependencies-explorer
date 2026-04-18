@@ -1,39 +1,37 @@
 import * as vscode from 'vscode';
-import { GoDependenciesTreeProvider } from "./dependenciesTree";
-import { GoExec } from './go';
+import { createTreeView, getFsUriOfSelectedItem } from "./treeView";
+import { GoExec } from './goExec';
 import { getGoBinPath, getGoExtensionAPI, GoExtensionAPI } from './goExtension';
-import { GoDepFileSystemProvider, newFsUriConverter as newFsUriConverter } from './goDependencyFS';
+import { FsUriConverter, GoDependenciesFileSystemProvider, newFsUriConverter } from './goDependenciesFsProvider';
 import { GitExtension } from './gitExtension';
 import { GoPackageDirectoriesProvider } from './goPackageDirectoriesProvider';
-import { SCHEME } from './goDependencyFSCommon';
-import { getExtPackagesDir, getStdLibDir } from './goEnv';
+import { getGoDepDirs } from './goDirs';
+import { commands } from 'vscode';
+import { IFindInFilesArgs } from './search';
+import { GoDirectoriesProvider } from './goDirectoriesProvider';
+import { SCHEME } from './goDependenciesFsCommon';
 
-var activated: boolean;
+let activated: boolean;
 
-export async function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext): Promise<any> {
     const goExtensionApi = await getGoExtensionAPI();
     if (goExtensionApi) {
-        await activateWithGo(goExtensionApi, context);
+        return await activateWithGo(context, goExtensionApi);
     } else {
         console.log('Waiting for Go extension to activate');
-        context.subscriptions.push(vscode.extensions.onDidChange(async e => {
+        return context.subscriptions.push(vscode.extensions.onDidChange(async e => {
             if (!activated) {
                 const goExtensionApi = await getGoExtensionAPI();
                 if (goExtensionApi) {
-                    await activateWithGo(goExtensionApi, context);
+                    await activateWithGo(context, goExtensionApi);
                 }
             }
         }));
     }
-    return { context };
 }
 
-async function activateWithGo(goExtensionApi: GoExtensionAPI, context: vscode.ExtensionContext) {
+async function activateWithGo(context: vscode.ExtensionContext, goExtensionApi: GoExtensionAPI,) {
     const goExec = new GoExec(getGoBinPath(goExtensionApi));
-
-    const env = await goExec.getEnv();
-    const stdLibDir = getStdLibDir(env);
-    const extPackagesDir = getExtPackagesDir(env);
 
     const rootConfig = 'go.dependencies.explorer';
     const conf = vscode.workspace.getConfiguration(rootConfig);
@@ -44,12 +42,14 @@ async function activateWithGo(goExtensionApi: GoExtensionAPI, context: vscode.Ex
         const gitExtensionApi: GitExtension | undefined = !isActive ? await gitExtension.activate() : gitExtension.exports;
         const gitApi = gitExtensionApi?.getAPI(1);
         if (gitApi) {
-            context.subscriptions.push(gitApi?.onDidOpenRepository(repository => {
+            context.subscriptions.push(gitApi.onDidOpenRepository(async repository => {
                 const preventOpenRepo = conf.get('prevent.open.git.repo');
                 if (!(!preventOpenRepo || preventOpenRepo === 'off')) {
                     const rootUri = repository.rootUri;
                     const rootPath = rootUri.fsPath;
-                    [stdLibDir, extPackagesDir].forEach(async dir => {
+
+                    const { stdLibDir, moduleDirs } = getGoDepDirs(goExec);
+                    [stdLibDir, moduleDirs].forEach(async dir => {
                         if (rootPath.startsWith(dir) || dir.startsWith(rootPath)) {
                             let close = true;
                             if (preventOpenRepo === 'ask') {
@@ -67,12 +67,51 @@ async function activateWithGo(goExtensionApi: GoExtensionAPI, context: vscode.Ex
         }
     }
 
-    const goPackDirProvider = new GoPackageDirectoriesProvider(goExec, stdLibDir, extPackagesDir);
-    const uriConv = newFsUriConverter(stdLibDir, extPackagesDir, goPackDirProvider);
-    const fsProvider = new GoDepFileSystemProvider(vscode.workspace.fs, uriConv.toFsUri);
+    const goPackDirProvider = new GoPackageDirectoriesProvider(goExec);
+    const uriConv = newFsUriConverter(goPackDirProvider);
+    const fsProvider = new GoDependenciesFileSystemProvider(vscode.workspace.fs, uriConv.toFsUri);
 
     context.subscriptions.push(vscode.workspace.registerFileSystemProvider(SCHEME, fsProvider, { isReadonly: true }));
-    context.subscriptions.push(await GoDependenciesTreeProvider.setup(vscode.workspace.fs, uriConv, goPackDirProvider));
+
+    const treeProvider = new GoDirectoriesProvider(goPackDirProvider);
+
+    await createTreeView(context, uriConv, treeProvider);
+
+    context.subscriptions.push(commands.registerCommand('go.dependencies.search.in.all.directories', async _ => {
+        const rootDirs = treeProvider.rootDirs;
+        const dirs = rootDirs.map(dir => getFsUriOfSelectedItem(dir, uriConv))
+            .filter(d => d !== undefined).map(uri => uri.fsPath)
+            .reduce((l, r) => l + "," + r);
+
+        await commands.executeCommand("workbench.action.findInFiles", {
+            filesToInclude: dirs,
+            triggerSearch: false,
+        } as IFindInFilesArgs);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('go.dependencies.search.in.directory', async item => {
+        const uri = getFsUriOfSelectedItem(item, uriConv);
+        if (uri) {
+            await commands.executeCommand("workbench.action.findInFiles", {
+                filesToInclude: uri.fsPath,
+                triggerSearch: false,
+            } as IFindInFilesArgs);
+        }
+    }));
+    context.subscriptions.push(commands.registerCommand('go.dependencies.copy.path', async item => {
+        await execCommandOnItem('copyFilePath', item, uriConv);
+    }));
+
+    context.subscriptions.push(commands.registerCommand('go.dependencies.open.in.integrated.terminal', async item => {
+        await execCommandOnItem('openInIntegratedTerminal', item, uriConv);
+    }));
+
+    ['mac', 'windows', 'linux'].forEach(os => {
+        context.subscriptions.push(commands.registerCommand(`go.dependencies.reveal.in.os.${os}`, async item => {
+            await execCommandOnItem('revealFileInOS', item, uriConv);
+        }));
+    });
+    context.subscriptions.push(commands.registerCommand('go.dependencies.refresh', async () => await treeProvider.refresh()));
 
     console.log('Go Dependencies Explorer activated');
     activated = true;
@@ -81,4 +120,11 @@ async function activateWithGo(goExtensionApi: GoExtensionAPI, context: vscode.Ex
 export function deactivate() {
     console.log('Go Dependencies Explorer deactivated');
     activated = false;
+}
+
+async function execCommandOnItem(command: string, item: any, uriConv: FsUriConverter) {
+    let uri = getFsUriOfSelectedItem(item, uriConv);
+    if (uri) {
+        await commands.executeCommand(command, uri);
+    }
 }

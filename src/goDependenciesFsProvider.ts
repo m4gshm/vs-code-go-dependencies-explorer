@@ -3,27 +3,18 @@ import {
     EventEmitter, Event, FileChangeEvent, FileSystemProvider,
     FileType, FileSystem, Uri, FilePermission, FileSystemError,
     Disposable,
-    FileStat
 } from 'vscode';
 import { GoPackageDirectoriesProvider } from './goPackageDirectoriesProvider';
-import { ROOT_EXT_PACK, ROOT_EXT_PACK_REPLACED, ROOT_STD_LIB, SCHEME } from './goDependencyFSCommon';
-import { Directory } from './directory';
+import { ROOT_MODULES, ROOT_MODULES_REPLACED, ROOT_STD_LIB, SCHEME } from './goDependenciesFsCommon';
 
-export interface RootDir {
-    code: string,
-    prefixPath: string
-}
-
-export class GoDepFileSystemProvider implements FileSystemProvider {
-
+export class GoDependenciesFileSystemProvider implements FileSystemProvider {
     private _emitter = new EventEmitter<FileChangeEvent[]>();
     readonly onDidChangeFile: Event<FileChangeEvent[]> = this._emitter.event;
 
     constructor(
         private readonly fs: FileSystem,
         private readonly toFsConv: (uri: Uri) => Uri | undefined,
-    ) {
-    }
+    ) { }
 
     async stat(uri: Uri) {
         const fsUri = this.toFsConv(uri);
@@ -70,44 +61,47 @@ export class GoDepFileSystemProvider implements FileSystemProvider {
     }
 }
 
-export function newFsUriConverter(stdLibDir: string, extPackagesDir: string, goPackDirProvider: GoPackageDirectoriesProvider): FsUriConverter {
-    return new FsUriConverter(stdLibDir, extPackagesDir, goPackDirProvider);
+export function newFsUriConverter(goPackDirProvider: GoPackageDirectoriesProvider): FsUriConverter {
+    return new FsUriConverter(goPackDirProvider);
 }
 
 function toFsPath(code: string): string {
     return Uri.file(code).fsPath;
 }
 
-
 export class FsUriConverter {
-    private readonly roots: {
-        code: string,
-        codePath: string,
-        pathPrefix: string
-    }[];
+    private modulesReplacedDirs: string[];
+    private roots: Roots[];
 
-    private extPackagesReplacedDirs: string[];
+    constructor(private readonly goPackDirProvider: GoPackageDirectoriesProvider) {
+        this.modulesReplacedDirs = [];
+        const { stdLibDir, moduleDirs } = this.goPackDirProvider.getDependencyDirs();
 
-    constructor(stdLibDir: string, extPackagesDir: string, goPackDirProvider: GoPackageDirectoriesProvider) {
         this.roots = [
             { code: ROOT_STD_LIB, codePath: toFsPath(ROOT_STD_LIB), pathPrefix: stdLibDir },
-            { code: ROOT_EXT_PACK, codePath: toFsPath(ROOT_EXT_PACK), pathPrefix: extPackagesDir },
-            { code: ROOT_EXT_PACK_REPLACED, codePath: toFsPath(ROOT_EXT_PACK_REPLACED), pathPrefix: "" },
+            { code: ROOT_MODULES, codePath: toFsPath(ROOT_MODULES), pathPrefix: moduleDirs },
+            { code: ROOT_MODULES_REPLACED, codePath: toFsPath(ROOT_MODULES_REPLACED), pathPrefix: "" },
         ];
-        this.extPackagesReplacedDirs = [];
 
-        goPackDirProvider.onRequestPackages(e => {
-            const replacedPrefixes = new Set(e.rootReplaced?.subdirs.map(subDir => {
-                return subDir.path;
-            }));
+        goPackDirProvider.onRequestPackages(dirs => {
+            const [stdLibDirs, moduleDirs] = dirs;
 
-            const rootPath = e.rootReplaced?.path;
+            // this.roots = [
+            //     { code: ROOT_STD_LIB, codePath: toFsPath(ROOT_STD_LIB), pathPrefix: stdLibDirs.root.path },
+            //     { code: ROOT_MODULES, codePath: toFsPath(ROOT_MODULES), pathPrefix: moduleDirs.root.path },
+            //     { code: ROOT_MODULES_REPLACED, codePath: toFsPath(ROOT_MODULES_REPLACED), pathPrefix: "" },
+            // ];
+
+            //update replaced modules;
+            const rootReplaced = moduleDirs.rootReplaced;
+            const replacedPrefixes = new Set(rootReplaced?.subdirs.map(subDir => subDir.path));
+
             const extPackagesReplacedDirs = Array.from(replacedPrefixes);
+            const rootPath = rootReplaced?.path;
             if (rootPath) {
                 extPackagesReplacedDirs.push(rootPath);
             }
-            this.extPackagesReplacedDirs = extPackagesReplacedDirs;
-            //log
+            this.modulesReplacedDirs = extPackagesReplacedDirs;
         });
     }
 
@@ -128,12 +122,6 @@ export class FsUriConverter {
             }
         }
         return undefined;
-    }
-
-    private foundReplaced(fsPath: string) {
-        return this.extPackagesReplacedDirs.find(dir => {
-            return fsPath.startsWith(dir);
-        });
     }
 
     toDepUri(uri: Uri) {
@@ -161,10 +149,20 @@ export class FsUriConverter {
         return undefined;
     }
 
+    private foundReplaced(fsPath: string) {
+        return this.modulesReplacedDirs.find(dir => {
+            return fsPath.startsWith(dir);
+        });
+    }
+
     private getFirstNotEmptyPathPart(fsPath: string) {
         const p = fsPath.startsWith(path.sep) ? fsPath.substring(1) : fsPath;
         const delimInd = p.indexOf(path.sep);
         const part = delimInd > -1 ? p.substring(0, delimInd) : p;
         return part;
     }
+}
+
+interface Roots {
+    code: string, codePath: string, pathPrefix: string;
 }

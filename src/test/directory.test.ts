@@ -1,9 +1,9 @@
 
 import assert from 'assert';
 import { Directory, DirectoryHierarchyBuilder, flat, normalizeWinPath } from '../directory';
-import { ROOT_STD_LIB } from '../goDependencyFSCommon';
 import path from 'node:path';
 import { suite, test } from 'node:test';
+import { ROOT_STD_LIB } from '../goDependenciesFsCommon';
 
 suite('Directory', () => {
   test('constructor creates directory with correct properties', () => {
