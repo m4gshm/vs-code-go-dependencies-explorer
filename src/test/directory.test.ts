@@ -2,7 +2,7 @@
 import assert from 'assert';
 import { Directory, DirectoryHierarchyBuilder, flat, normalizeWinPath } from '../directory';
 import path from 'node:path';
-import { suite, test } from 'node:test';
+import { suite, test, before } from 'node:test';
 import { ROOT_STD_LIB } from '../goDependenciesFsCommon';
 
 suite('Directory', () => {
@@ -230,6 +230,8 @@ suite('DirectoryHierarchyBuilder', () => {
 });
 
 suite('normalizeWinPath', () => {
+  const runWindowsOnly = { skip: process.platform !== 'win32' ? 'Only for Windows' : false };
+
   test('on non-Windows platform returns unchanged path', () => {
     // Mock platform to be non-Windows for test consistency
     const originalPlatform = process.platform;
@@ -244,31 +246,16 @@ suite('normalizeWinPath', () => {
     }
   });
 
-  test('on Windows with uppercase drive letter converts to lowercase', () => {
-    const originalPlatform = process.platform;
-    Object.defineProperty(process, 'platform', { value: 'win32' });
+  test('on Windows with uppercase drive letter converts to lowercase', runWindowsOnly, () => {
+    const path = 'C:\\Windows\\System';
+    const result = normalizeWinPath(path);
+    assert.strictEqual(result, 'c:\\Windows\\System');
 
-    try {
-      const path = 'C:\\Windows\\System';
-      const result = normalizeWinPath(path);
-      assert.strictEqual(result, 'c:\\Windows\\System');
-    } finally {
-      Object.defineProperty(process, 'platform', { value: originalPlatform });
-    }
   });
 
-  test('on Windows with already lowercase drive letter unchanged', () => {
-    const originalPlatform = process.platform;
-    Object.defineProperty(process, 'platform', { value: 'win32' });
-
-    try {
-      const path = 'c:\\Windows\\System';
-      const result = normalizeWinPath(path);
-      assert.strictEqual(result, path);
-    } finally {
-      Object.defineProperty(process, 'platform', { value: originalPlatform });
-    }
+  test('on Windows with already lowercase drive letter unchanged', runWindowsOnly, () => {
+    const path = 'c:\\Windows\\System';
+    const result = normalizeWinPath(path);
+    assert.strictEqual(result, path);
   });
 });
-
-// Note: asRoot and collapse are not exported, so they're tested indirectly through create methods
