@@ -18,6 +18,7 @@ export async function createTreeView(ctx: ExtensionContext, uriConv: FsUriConver
   const treeView = window.createTreeView("go.dependencies.explorer", {
     showCollapseAll: true, treeDataProvider: new GoTreeDataProvider(onDidChangeTreeData, uriConv, treeProvider),
   });
+  subscriptions.push(treeView);
 
   subscriptions.push(treeView.onDidChangeSelection(async event => {
     const selections = event.selection;
@@ -33,10 +34,7 @@ export async function createTreeView(ctx: ExtensionContext, uriConv: FsUriConver
   }));
   subscriptions.push(treeView.onDidChangeVisibility(async event => {
     if (event.visible) {
-      const activeTab = window.tabGroups.activeTabGroup.activeTab;
-      if (activeTab) {
-        selectFileOfActiveTabInTree(activeTab);
-      }
+      syncSelectedFileWithActiveTab();
     }
   }));
   subscriptions.push(window.tabGroups.onDidChangeTabs(tabs => {
@@ -76,27 +74,35 @@ export async function createTreeView(ctx: ExtensionContext, uriConv: FsUriConver
     }
   }
 
+  function syncSelectedFileWithActiveTab() {
+    const activeTab = window.tabGroups.activeTabGroup.activeTab;
+    if (activeTab) {
+      selectFileOfActiveTabInTree(activeTab);
+    }
+  }
+
   async function refresh() {
     await treeProvider.refresh();
     onDidChangeTreeData.fire(undefined);
   }
 
-  function watchChanges() {
-    async function handleFileEvent(op: string, filePattern: GlobPattern, event: Uri) {
-      console.debug(`handleFileEvent: ${op}, ${filePattern}, ${event}`);
-      await refresh();
-    }
-    const filePattern = '**/go.{mod,sum}';
-    const gofileWatcher = workspace.createFileSystemWatcher(filePattern);
-    gofileWatcher.onDidCreate(e => handleFileEvent('create', filePattern, e));
-    gofileWatcher.onDidChange(e => handleFileEvent('change', filePattern, e));
-    gofileWatcher.onDidDelete(e => handleFileEvent('delete', filePattern, e));
-    return gofileWatcher;
-  }
+  const handleFileEvent = async (op: string, filePattern: GlobPattern, event: Uri) => {
+    console.debug(`handleFileEvent: ${op}, ${filePattern}, ${event}`);
+    await refresh();
+  };
+  const filePattern = '**/go.{mod,sum}';
+  const gofileWatcher = workspace.createFileSystemWatcher(filePattern);
+  gofileWatcher.onDidCreate(e => handleFileEvent('create', filePattern, e));
+  gofileWatcher.onDidChange(e => handleFileEvent('change', filePattern, e));
+  gofileWatcher.onDidDelete(e => handleFileEvent('delete', filePattern, e));
+  subscriptions.push(gofileWatcher);
 
-  subscriptions.push(watchChanges());
-
-  subscriptions.push(treeView);
+  const workspaceListener = workspace.onDidChangeWorkspaceFolders(event => {
+    console.debug(`handle workspace folders changing, added: ${event.added}, removed: ${event.removed}`);
+    refresh();
+    syncSelectedFileWithActiveTab();
+  });
+  subscriptions.push(workspaceListener);
 
   await treeProvider.refresh();
   commands.executeCommand('setContext', 'go.dependencies.explorer.show', true);

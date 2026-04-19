@@ -6,10 +6,10 @@ async function main() {
   const ctx = await esbuild.context({
     entryPoints: ['src/extension.ts'],
     format: 'cjs',
-    minify: false,
+    minify: true,
     bundle: true,
-    sourcemap: false,
-    sourcesContent: false,
+    sourcemap: true,
+    sourcesContent: true,
     platform: 'node',
     outfile: 'dist/extension.js',
     external: ['vscode'],

@@ -12,3 +12,11 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+require (
+	replaced_package v1.0.0 
+	outside_replaced_package v1.0.0 
+)
+
+replace replaced_package => ../replaced_package
+replace outside_replaced_package => ../../go_outside_replaced_package

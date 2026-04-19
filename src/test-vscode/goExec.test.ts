@@ -6,6 +6,8 @@ import { getModulesPath, getStdLibPath } from '../goDirs';
 import { normalizeWinPath } from '../directory';
 
 suite('GoExec Test Suite', () => {
+  const workDir = join(__dirname, '../../goWorkspace/go_stub');
+  const workDir2 = join(__dirname, '../../src');
   let goExtensionApi: GoExtensionAPI | undefined;
   let goExec: GoExec | undefined;
   let goEnv: any;
@@ -41,7 +43,6 @@ suite('GoExec Test Suite', () => {
   });
 
   test('listPackageDirs with workDir and excludeWorkDir false', () => {
-    const workDir = join(__dirname, '../../go-stub');
     const dirs = goExec!.listPackageDirs(workDir, false);
     assert.ok(Array.isArray(dirs));
     // Should include the workDir itself (since excludeWorkDir = false)
@@ -50,16 +51,13 @@ suite('GoExec Test Suite', () => {
   });
 
   test('listAllPackageDirs with multiple workDirs', () => {
-    const workDir1 = join(__dirname, '../../go-stub');
-    const workDir2 = join(__dirname, '../../src');
-    const dirs = goExec!.listAllPackageDirs([workDir1, workDir2]);
+    const dirs = goExec!.listAllPackageDirs([workDir, workDir2]);
     assert.ok(Array.isArray(dirs));
     // Should contain directories from both workDirs (or at least from one)
     assert.ok(dirs.length >= 0);
   });
 
   test('getModules returns modules', () => {
-    const workDir = join(__dirname, '../../go-stub');
     const modules = goExec!.getModules(undefined, workDir);
     assert.ok(Array.isArray(modules));
     // At least the stub module should be present
@@ -70,7 +68,6 @@ suite('GoExec Test Suite', () => {
   });
 
   test('getModules with specific module name', () => {
-    const workDir = join(__dirname, '../../go-stub');
     const modules = goExec!.getModules('stub', workDir);
     assert.ok(Array.isArray(modules));
     assert.strictEqual(modules.length, 1);

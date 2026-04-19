@@ -1,4 +1,5 @@
-import cp, { ExecFileSyncOptionsWithStringEncoding } from 'child_process';
+import cp from 'child_process';
+import fs from 'fs';
 import { URL } from 'url';
 import { normalizeWinPath } from './directory';
 
@@ -20,17 +21,14 @@ export class GoExec {
 
     public listPackageDirs(workDir: string | undefined = undefined, excludeWorkDir = true) {
         const args = ['list', '-f', '{{.Dir}}', '-e', 'all'];
-        let result: string;
-        try {
-            result = this.execGo(args, workDir);
-        } catch (err) {
-            if ('go: warning: "all" matched no packages' === err) {
-                return [];
-            } else {
-                throw err;
-            }
+        const result = this.execGo(args, workDir, false);
+        const stderr = result.stderr;
+        if (stderr && 'go: warning: "all" matched no packages' === stderr) {
+            return [];
+        } else if (stderr && stderr.length > 0) {
+            throw this.newError(args, stderr);
         }
-        const out = result;
+        const out = result.stdout;
         const dir = out.split('\n').filter(dir => dir.length > 0);
         if (workDir && excludeWorkDir) {
             return dir.filter(dir => !dir.startsWith(workDir));
@@ -41,8 +39,7 @@ export class GoExec {
     public getEnv(workDir: WorkDir = undefined) {
         const cmd = ['env', '-json'];
         const result = this.execGo(cmd, workDir);
-        const out = result;
-        const rawJson = JSON.parse(out);
+        const rawJson = JSON.parse(result.stdout);
         return rawJson;
     }
 
@@ -54,7 +51,7 @@ export class GoExec {
             args.push(moduleName);
         }
         const result = this.execGo(args, workDir);
-        const modules = result.split('\n').filter(line => line.length > 0).map(pair => {
+        const modules = result.stdout.split('\n').filter(line => line.length > 0).map(pair => {
             const parts = pair.split(delim);
             const path = parts[0];
             const dir = parts[1];
@@ -64,19 +61,25 @@ export class GoExec {
         return modules;
     }
 
-    private execGo(args: string[], workDir: WorkDir = undefined) {
-        return this.exec(this.goPath, args, workDir);
+    private execGo(args: string[], workDir: WorkDir = undefined, throwStdErr = true) {
+        return this.exec(this.goPath, args, workDir, throwStdErr);
     }
 
-    private exec(command: string, args: string[], workDir: WorkDir) {
-        try {
-            const stdout = cp.execFileSync(command, args, { cwd: workDir, encoding: 'utf8' });
-            return stdout;
-        } catch (err) {
-            if (typeof err === "string") {
-                throw this.newError(args, err);
-            }
+    private exec(command: string, args: string[], workDir: WorkDir, throwStdErr = true) {
+        if (workDir && !fs.existsSync(workDir)) {
+            throw new Error(`The working directory does not exist: ${workDir}`);
+        }
+        const result = cp.spawnSync(command, args, { cwd: workDir, encoding: 'utf8' });
+        const err = result.error;
+        if (err) {
             throw err;
+        }
+        const stderr = result.stderr?.trim();
+        const stdout = result.stdout.trim();
+        if (throwStdErr && stderr.length > 0) {
+            throw this.newError([command, ...args], result.stderr);
+        } else {
+            return !throwStdErr && stderr.length > 0 ? { stdout, stderr } : { stdout };
         }
     }
 
