@@ -4,7 +4,7 @@ import {
     FileType, FileSystem, Uri, FilePermission, FileSystemError,
     Disposable,
 } from 'vscode';
-import { GoPackageDirectoriesProvider } from './goPackageDirectoriesProvider';
+import { GoPackageProvider } from './goPackageProvider';
 import { ROOT_MODULES, ROOT_MODULES_REPLACED, ROOT_STD_LIB, SCHEME } from './goDependenciesFsCommon';
 
 export class GoDependenciesFileSystemProvider implements FileSystemProvider {
@@ -61,8 +61,8 @@ export class GoDependenciesFileSystemProvider implements FileSystemProvider {
     }
 }
 
-export function newFsUriConverter(goPackDirProvider: GoPackageDirectoriesProvider): FsUriConverter {
-    return new FsUriConverter(goPackDirProvider);
+export function newFsUriConverter(packageProvider: GoPackageProvider): FsUriConverter {
+    return new FsUriConverter(packageProvider);
 }
 
 function toFsPath(code: string): string {
@@ -73,27 +73,27 @@ export class FsUriConverter {
     private modulesReplacedDirs: string[];
     private roots: Roots[];
 
-    constructor(private readonly goPackDirProvider: GoPackageDirectoriesProvider) {
+    constructor(private readonly packageProvider: GoPackageProvider) {
         this.modulesReplacedDirs = [];
-        const { stdLibDir, moduleDirs } = this.goPackDirProvider.getDependencyDirs();
+        const { stdLibPath, modulePath } = this.packageProvider.getPackagePaths();
 
         this.roots = [
-            { code: ROOT_STD_LIB, codePath: toFsPath(ROOT_STD_LIB), pathPrefix: stdLibDir },
-            { code: ROOT_MODULES, codePath: toFsPath(ROOT_MODULES), pathPrefix: moduleDirs },
+            { code: ROOT_STD_LIB, codePath: toFsPath(ROOT_STD_LIB), pathPrefix: stdLibPath },
+            { code: ROOT_MODULES, codePath: toFsPath(ROOT_MODULES), pathPrefix: modulePath },
             { code: ROOT_MODULES_REPLACED, codePath: toFsPath(ROOT_MODULES_REPLACED), pathPrefix: "" },
         ];
 
-        goPackDirProvider.onRequestPackages(dirs => {
-            const [stdLibDirs, moduleDirs] = dirs;
+        packageProvider.onRequestPackages(dirs => {
+            const [stdLibDirs, modulePath] = dirs;
 
             // this.roots = [
             //     { code: ROOT_STD_LIB, codePath: toFsPath(ROOT_STD_LIB), pathPrefix: stdLibDirs.root.path },
-            //     { code: ROOT_MODULES, codePath: toFsPath(ROOT_MODULES), pathPrefix: moduleDirs.root.path },
+            //     { code: ROOT_MODULES, codePath: toFsPath(ROOT_MODULES), pathPrefix: modulePath.root.path },
             //     { code: ROOT_MODULES_REPLACED, codePath: toFsPath(ROOT_MODULES_REPLACED), pathPrefix: "" },
             // ];
 
             //update replaced modules;
-            const rootReplaced = moduleDirs.rootReplaced;
+            const rootReplaced = modulePath.rootReplaced;
             const replacedPrefixes = new Set(rootReplaced?.subdirs.map(subDir => subDir.path));
 
             const extPackagesReplacedDirs = Array.from(replacedPrefixes);

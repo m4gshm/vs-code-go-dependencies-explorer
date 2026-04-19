@@ -3,64 +3,64 @@ import { Directory, DirectoryHierarchyBuilder, flat, normalizeWinPath } from './
 import { parse, join } from 'path';
 import { GoExec } from './goExec';
 import { EventEmitter, workspace, Disposable } from 'vscode';
-import { getModulesDir, getStdLibDir, getGoDepDirs } from './goDirs';
+import { getModulesPath, getStdLibPath, getGoPackagePaths } from './goDirs';
 import { ROOT_MODULES, ROOT_STD_LIB } from './goDependenciesFsCommon';
 
 export const GO_MOD_PATTERN = '**/go.mod';
 export const GO_SUM_PATTERN = '**/go.sum';
 
-export class GoPackageDirectoriesProvider implements Disposable {
+export class GoPackageProvider implements Disposable {
     constructor(private readonly goExec: GoExec) { }
 
-    private readonly _onRequestPackages = new EventEmitter<[GoStdLibDirs, GoPackageDirs]>();
+    private readonly _onRequestPackages = new EventEmitter<[GoStdLibPakages, GoModuleDirs]>();
     readonly onRequestPackages = this._onRequestPackages.event;
 
-    public getDependencyDirs() {
-        return getGoDepDirs(this.goExec);
+    getPackagePaths() {
+        return getGoPackagePaths(this.goExec);
     }
 
-    async getGoPackages() {
-        const dirs = await getGoPackageDirs(this.goExec);
+    async getPackages() {
+        const dirs = await getGoPackages(this.goExec);
         this._onRequestPackages.fire(dirs);
         return dirs;
     }
 
-    public dispose(): void {
+    dispose(): void {
         this._onRequestPackages.dispose();
     }
 }
 
-export interface GoStdLibDirs {
+export interface GoStdLibPakages {
     root: Directory;
-    flatDirs: Map<string, Directory>;
+    // flatDirs: Map<string, Directory>;
 }
 
-export interface GoPackageDirs {
+export interface GoModuleDirs {
     root: Directory;
-    flatDirs: Map<string, Directory>;
+    // flatDirs: Map<string, Directory>;
     rootReplaced: Directory | undefined;
-    flatReplaced: Map<string, Directory>;
+    // flatReplaced: Map<string, Directory>;
 }
 
-async function getGoPackageDirs(goExec: GoExec): Promise<[GoStdLibDirs, GoPackageDirs]> {
+async function getGoPackages(goExec: GoExec): Promise<[GoStdLibPakages, GoModuleDirs]> {
     const getPackageDirs = (dir: string) => Array.from(new Set(listGoPackageDirs(dir)));
 
-    const getGoStdLib = () => {
+    const getGoStdLibDirs = () => {
         const env = goExec.getEnv();
-        const stdLibDir = getStdLibDir(env);
+        const stdLibPath = getStdLibPath(env);
 
-        console.debug(`retrieving Go package for standard library ${stdLibDir}`);
+        console.debug(`retrieving Go package for standard library ${stdLibPath}`);
 
-        const stdGoPackageDirs = getPackageDirs(stdLibDir);
+        const stdGoPackageDirs = getPackageDirs(stdLibPath);
         const label = 'Standard library';
-        const root = DirectoryHierarchyBuilder.create(stdGoPackageDirs, stdLibDir, ROOT_STD_LIB, label)!!.toDirectory();
-        const flatDirs = flat([root]);
+        const root = DirectoryHierarchyBuilder.create(stdGoPackageDirs, stdLibPath, ROOT_STD_LIB, label)!!.toDirectory();
+        // const flatDirs = flat([root]);
 
-        return { root: root, flatDirs: flatDirs };
+        return { root/*, flatDirs*/ };
     };
 
-    const getGoModulesPackageDirs = async () => {
-        const extPackagesDir = getModulesDir(goExec.getEnv());
+    const getGoModuleDirs = async () => {
+        const extPackagesDir = getModulesPath(goExec.getEnv());
 
         const rootDirs = (await workspace.findFiles(GO_MOD_PATTERN)).map(f => parse(f.fsPath).dir).map(dir => normalizeWinPath(dir));
         console.debug(`retrieving Go module directories ${rootDirs}`);
@@ -100,9 +100,9 @@ async function getGoPackageDirs(goExec: GoExec): Promise<[GoStdLibDirs, GoPackag
             }
         }
 
-        const moduleDirs = Array.from(moduleDirsSet);
-        console.debug(`retrieving Go package dirs for module dirs ${moduleDirs}`);
-        const modulePackageDirs = moduleDirs.map(d => getPackageDirs(d)).flatMap(dd => dd);
+        const modulePath = Array.from(moduleDirsSet);
+        console.debug(`retrieving Go package dirs for module dirs ${modulePath}`);
+        const modulePackageDirs = modulePath.map(d => getPackageDirs(d)).flatMap(dd => dd);
 
         const replacedDirs = Array.from(replacedDirsSet);
         console.debug(`retrieving Go replaced package dirs for module dirs ${replacedDirs}`);
@@ -110,13 +110,13 @@ async function getGoPackageDirs(goExec: GoExec): Promise<[GoStdLibDirs, GoPackag
 
         const root = DirectoryHierarchyBuilder.create(modulePackageDirs, extPackagesDir, ROOT_MODULES, 'External packages')!!.toDirectory();
         const rootReplaced = DirectoryHierarchyBuilder.create(replacedPackageDirs, undefined, undefined, undefined, true)?.toDirectory();
-        const flatDirs = flat([root]);
-        const flatDirsReplaced = rootReplaced ? flat([rootReplaced]) : new Map<string, Directory>();
+        // const flatDirs = flat([root]);
+        // const flatReplaced = rootReplaced ? flat([rootReplaced]) : new Map<string, Directory>();
 
-        return { root: root, flatDirs: flatDirs, rootReplaced: rootReplaced, flatReplaced: flatDirsReplaced };
+        return { root/*, flatDirs*/, rootReplaced/*, flatReplaced*/ };
     };
 
-    return [getGoStdLib(), await getGoModulesPackageDirs()];
+    return [getGoStdLibDirs(), await getGoModuleDirs()];
 }
 
 

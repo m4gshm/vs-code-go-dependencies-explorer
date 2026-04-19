@@ -2,7 +2,7 @@ import * as assert from 'assert';
 import { join } from 'path';
 import { getGoBinPath, getGoExtensionAPI, GoExtensionAPI } from '../goExtension';
 import { GoExec } from '../goExec';
-import { getModulesDir, getStdLibDir } from '../goDirs';
+import { getModulesPath, getStdLibPath } from '../goDirs';
 import { normalizeWinPath } from '../directory';
 
 suite('GoExec Test Suite', () => {
@@ -20,14 +20,14 @@ suite('GoExec Test Suite', () => {
     }
   });
 
-  test('stdLibDir test', () => {
-    const stdLibDir = getStdLibDir(goEnv);
+  test('stdLibPath test', () => {
+    const stdLibPath = getStdLibPath(goEnv);
     const expected = normalizeWinPath(join(`${goEnv['GOROOT']}`, 'src'));
-    assert.strictEqual(expected, stdLibDir);
+    assert.strictEqual(expected, stdLibPath);
   });
 
-  test('extPackagesDir test', () => {
-    const extPackagesDir = getModulesDir(goEnv);
+  test('modulesPath test', () => {
+    const extPackagesDir = getModulesPath(goEnv);
     const expected = normalizeWinPath(`${goEnv['GOMODCACHE']}`);
     assert.strictEqual(expected, extPackagesDir);
   });

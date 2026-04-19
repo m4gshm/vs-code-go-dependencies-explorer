@@ -2,19 +2,19 @@ import { normalizeWinPath } from "./directory";
 import { join } from 'path';
 import { GoExec } from "./goExec";
 
-export function getGoDepDirs(goExec: GoExec) {
+export function getGoPackagePaths(goExec: GoExec) {
     const env = goExec.getEnv();
-    const stdLibDir = getStdLibDir(env);
-    const moduleDirs = getModulesDir(env);
-    return { stdLibDir, moduleDirs };
+    const stdLibPath = getStdLibPath(env);
+    const modulePath = getModulesPath(env);
+    return { stdLibPath, modulePath };
 }
 
-export function getStdLibDir(env: any) {
+export function getStdLibPath(env: any) {
     const goRoot = env['GOROOT'];
     return normalizeWinPath(join(`${goRoot}`, 'src'));
 }
 
-export function getModulesDir(env: any) {
+export function getModulesPath(env: any) {
     const goModCache = env['GOMODCACHE'];
     return normalizeWinPath(`${goModCache}`);
 }

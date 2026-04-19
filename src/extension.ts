@@ -4,11 +4,11 @@ import { GoExec } from './goExec';
 import { getGoBinPath, getGoExtensionAPI, GoExtensionAPI } from './goExtension';
 import { FsUriConverter, GoDependenciesFileSystemProvider, newFsUriConverter } from './goDependenciesFsProvider';
 import { GitExtension } from './gitExtension';
-import { GoPackageDirectoriesProvider } from './goPackageDirectoriesProvider';
-import { getGoDepDirs } from './goDirs';
+import { GoPackageProvider } from './goPackageProvider';
+import { getGoPackagePaths } from './goDirs';
 import { commands } from 'vscode';
 import { IFindInFilesArgs } from './search';
-import { GoDirectoriesProvider } from './goDirectoriesProvider';
+import { GoTreeItemProvider } from './goTreeItemProvider';
 import { SCHEME } from './goDependenciesFsCommon';
 
 let activated: boolean;
@@ -48,8 +48,8 @@ async function activateWithGo(context: vscode.ExtensionContext, goExtensionApi: 
                     const rootUri = repository.rootUri;
                     const rootPath = rootUri.fsPath;
 
-                    const { stdLibDir, moduleDirs } = getGoDepDirs(goExec);
-                    [stdLibDir, moduleDirs].forEach(async dir => {
+                    const { stdLibPath: stdLibPath, modulePath: modulesPath } = getGoPackagePaths(goExec);
+                    [stdLibPath, modulesPath].forEach(async dir => {
                         if (rootPath.startsWith(dir) || dir.startsWith(rootPath)) {
                             let close = true;
                             if (preventOpenRepo === 'ask') {
@@ -67,13 +67,13 @@ async function activateWithGo(context: vscode.ExtensionContext, goExtensionApi: 
         }
     }
 
-    const goPackDirProvider = new GoPackageDirectoriesProvider(goExec);
+    const goPackDirProvider = new GoPackageProvider(goExec);
     const uriConv = newFsUriConverter(goPackDirProvider);
     const fsProvider = new GoDependenciesFileSystemProvider(vscode.workspace.fs, uriConv.toFsUri);
 
     context.subscriptions.push(vscode.workspace.registerFileSystemProvider(SCHEME, fsProvider, { isReadonly: true }));
 
-    const treeProvider = new GoDirectoriesProvider(goPackDirProvider);
+    const treeProvider = await GoTreeItemProvider.new(goPackDirProvider);
 
     await createTreeView(context, uriConv, treeProvider);
 

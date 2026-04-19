@@ -1,10 +1,10 @@
 import { TreeItem, TreeItemCollapsibleState, Uri } from "vscode";
-import { Directory } from "./directory";
-import { GoPackageDirectoriesProvider } from "./goPackageDirectoriesProvider";
+import { Directory, flat } from "./directory";
+import { GoPackageProvider } from "./goPackageProvider";
 import { join } from 'path';
 import { SCHEME } from "./goDependenciesFsCommon";
 
-export class GoDirectoriesProvider {
+export class GoTreeItemProvider {
     private _stdLibRootDir!: GoDirItem;
     private _stdLibDirs: Map<string, GoDirItem> = new Map();
     private _modulesRootDir!: GoDirItem;
@@ -12,7 +12,13 @@ export class GoDirectoriesProvider {
     private _replacedRootDir!: GoDirItem | undefined;
     private _replacedDirs: Map<string, GoDirItem> = new Map();
 
-    constructor(private readonly goPackDirProvider: GoPackageDirectoriesProvider) { }
+    static async new(packageProvider: GoPackageProvider) {
+        const p = new GoTreeItemProvider(packageProvider);
+        await p.refresh();
+        return p;
+    }
+
+    private constructor(private readonly packageProvider: GoPackageProvider) { }
 
     get rootDirs(): GoDirItem[] {
         return [this._stdLibRootDir, this._modulesRootDir, this._replacedRootDir].filter(d => d !== undefined);
@@ -26,16 +32,19 @@ export class GoDirectoriesProvider {
         const convertToGoDirs = (flatDirs: Map<string, Directory>) => new Map(Array.from(flatDirs.entries())
             .map(([fullPath, dir]) => [fullPath, newGoDirItem(dir)]));
 
-        const [std, modules] = await this.goPackDirProvider.getGoPackages();
+        const [std, modules] = await this.packageProvider.getPackages();
 
         this._stdLibRootDir = newGoDirItem(std.root);
-        this._stdLibDirs = convertToGoDirs(std.flatDirs);
+
+        this._stdLibDirs = convertToGoDirs(flat([std.root]));
 
         this._modulesRootDir = newGoDirItem(modules.root);
-        this._modulesDirs = convertToGoDirs(modules.flatDirs);
+        this._modulesDirs = convertToGoDirs(flat([modules.root]));
 
-        this._replacedRootDir = modules.rootReplaced ? newGoDirItem(modules.rootReplaced) : undefined;
-        this._replacedDirs = convertToGoDirs(modules.flatReplaced);
+        const rootReplaced = modules.rootReplaced;
+        this._replacedRootDir = rootReplaced ? newGoDirItem(rootReplaced) : undefined;
+        const flatReplaced = rootReplaced ? flat([rootReplaced]) : new Map<string, Directory>();
+        this._replacedDirs = convertToGoDirs(flatReplaced);
     }
 }
 

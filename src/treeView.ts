@@ -1,75 +1,22 @@
 import { parse, join } from 'path';
 import { FsUriConverter } from './goDependenciesFsProvider';
 import {
-    commands, EventEmitter, FileType, GlobPattern, Tab, TabInputText,
-    TreeItem,
-    Uri, window, workspace,
-    ExtensionContext
+  commands, EventEmitter, FileType, GlobPattern, Tab, TabInputText,
+  TreeItem,
+  Uri, window, workspace,
+  ExtensionContext,
+  TreeDataProvider, Event
 } from 'vscode';
-import { dependencyUri, FileItem, GoDirectoriesProvider, GoDirItem } from './goDirectoriesProvider';
+import { dependencyUri, FileItem, GoTreeItemProvider, GoDirItem } from './goTreeItemProvider';
 
-
-export async function createTreeView(ctx: ExtensionContext, uriConv: FsUriConverter, treeProvider: GoDirectoriesProvider) {
+export async function createTreeView(ctx: ExtensionContext, uriConv: FsUriConverter, treeProvider: GoTreeItemProvider) {
   const onDidChangeTreeData = new EventEmitter<undefined>();
 
   const subscriptions = ctx.subscriptions;
   subscriptions.push(onDidChangeTreeData);
 
   const treeView = window.createTreeView("go.dependencies.explorer", {
-    showCollapseAll: true, treeDataProvider: {
-      onDidChangeTreeData: onDidChangeTreeData.event,
-
-      getTreeItem: (element: TreeItem) => element,
-
-      async getChildren(element?: TreeItem): Promise<TreeItem[]> {
-        if (element instanceof GoDirItem) {
-          let children = element.children;
-          if (children) {
-            return children;
-          } else {
-            const dir = element.dir;
-            const dirUri = dependencyUri(dir.path);
-            const newUri = uriConv.toFsUri(dirUri);
-            if (!newUri) {
-              throw new Error(`Bad dependency dir "${dirUri}"`);
-            }
-            const dirContent = dir.findFiles ? await workspace.fs.readDirectory(newUri) : [];
-            const files = dirContent.filter(([_, type]) => {
-              return type !== FileType.Directory;
-            }).map(([filename, _]) => {
-              return new FileItem(filename, dir.path!!);
-            });
-            const subdirs = dir.subdirs.map(d => new GoDirItem(d));
-            const newChildren = [...subdirs, ...files];
-            element.children = newChildren;
-            return newChildren;
-          }
-        } else {
-          return !element ? treeProvider.rootDirs : [];
-        }
-      },
-
-      async getParent(element: TreeItem): Promise<TreeItem | undefined> {
-        const id = element.id;
-        if (id) {
-          let nextLevelPath = id;
-          let treeItemDir: GoDirItem | undefined;
-          while (!treeItemDir) {
-            const path = parse(nextLevelPath);
-            const isRoot = path.root === path.dir && path.base.length === 0;
-            if (isRoot) {
-              break;
-            }
-            nextLevelPath = path.dir;
-            treeItemDir = treeProvider.findDir(nextLevelPath);
-          }
-          if (treeItemDir) {
-            return treeItemDir;
-          }
-        }
-        return undefined;
-      }
-    },
+    showCollapseAll: true, treeDataProvider: new GoTreeDataProvider(onDidChangeTreeData, uriConv, treeProvider),
   });
 
   subscriptions.push(treeView.onDidChangeSelection(async event => {
@@ -174,4 +121,68 @@ export function getFsUriOfSelectedItem(item: any, uriConv: FsUriConverter) {
   }
   return uri;
 }
+
+export class GoTreeDataProvider implements TreeDataProvider<TreeItem> {
+  readonly onDidChangeTreeData: Event<TreeItem | undefined>;
+
+  constructor(
+    _onDidChangeTreeData: EventEmitter<TreeItem | undefined>,
+    private uriConv: FsUriConverter,
+    private treeProvider: GoTreeItemProvider
+  ) {
+    this.onDidChangeTreeData = _onDidChangeTreeData.event;
+  }
+
+  getTreeItem(element: TreeItem) { return element; }
+
+  async getChildren(element?: TreeItem): Promise<TreeItem[]> {
+    if (element instanceof GoDirItem) {
+      let children = element.children;
+      if (children) {
+        return children;
+      } else {
+        const dir = element.dir;
+        const dirUri = dependencyUri(dir.path);
+        const newUri = this.uriConv.toFsUri(dirUri);
+        if (!newUri) {
+          throw new Error(`Bad dependency dir "${dirUri}"`);
+        }
+        const dirContent = dir.findFiles ? await workspace.fs.readDirectory(newUri) : [];
+        const files = dirContent.filter(([_, type]) => {
+          return type !== FileType.Directory;
+        }).map(([filename, _]) => {
+          return new FileItem(filename, dir.path!!);
+        });
+        const subdirs = dir.subdirs.map(d => new GoDirItem(d));
+        const newChildren = [...subdirs, ...files];
+        element.children = newChildren;
+        return newChildren;
+      }
+    } else {
+      return !element ? this.treeProvider.rootDirs : [];
+    }
+  }
+
+  async getParent(element: TreeItem): Promise<TreeItem | undefined> {
+    const id = element.id;
+    if (id) {
+      let nextLevelPath = id;
+      let treeItemDir: GoDirItem | undefined;
+      while (!treeItemDir) {
+        const path = parse(nextLevelPath);
+        const isRoot = path.root === path.dir && path.base.length === 0;
+        if (isRoot) {
+          break;
+        }
+        nextLevelPath = path.dir;
+        treeItemDir = this.treeProvider.findDir(nextLevelPath);
+      }
+      if (treeItemDir) {
+        return treeItemDir;
+      }
+    }
+    return undefined;
+  }
+}
+
 
