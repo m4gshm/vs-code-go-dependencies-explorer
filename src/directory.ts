@@ -2,7 +2,7 @@ import path, { parse, join } from 'path';
 
 export class Directory {
     constructor(
-        public readonly label: string,
+        public readonly name: string,
         public readonly path: string,
         public readonly findFiles: boolean,
         public readonly subdirs: Directory[],
@@ -44,19 +44,18 @@ export class DirectoryHierarchyBuilder {
     public static create(
         dirPaths: string[],
         expectedRootDir: string | undefined = undefined,
-        expectedRootDirReplace: string | undefined = undefined,
-        expectedRootName: string | undefined = undefined,
-        collapseFirst: boolean = false,
+        rootDirCode: string | undefined = undefined,
+        rootName: string | undefined = undefined,
     ) {
         let root = expectedRootDir ? DirectoryHierarchyBuilder.newHierarchyBuilder(
-            expectedRootDir, expectedRootDir, expectedRootDirReplace, expectedRootName
+            expectedRootDir, expectedRootDir, rootDirCode, rootName
         ) : undefined;
         for (let dirPath of dirPaths) {
             if (expectedRootDir && !dirPath.startsWith(expectedRootDir)) {
                 console.warn(`path "${dirPath}" must be start from "${expectedRootDir}"`);
             } else {
                 let newRoot = DirectoryHierarchyBuilder.newHierarchyBuilder(dirPath, expectedRootDir,
-                    expectedRootDirReplace, expectedRootName
+                    rootDirCode, rootName
                 );
                 if (!root) {
                     root = newRoot;
@@ -71,7 +70,7 @@ export class DirectoryHierarchyBuilder {
             }
         }
         if (root) {
-            const [_, collapsedRoot] = collapse(expectedRootDir ? expectedRootDir : '', root, collapseFirst);
+            const [_, collapsedRoot] = collapse(expectedRootDir ? expectedRootDir : '', root);
             return collapsedRoot;
         } else {
             return undefined;
@@ -79,11 +78,16 @@ export class DirectoryHierarchyBuilder {
     }
 
     static newHierarchyBuilder(dirPath: string, expectedRootDir: string | undefined = undefined,
-        expectedRootDirReplace: string | undefined = undefined, expectedRootName: string | undefined = undefined) {
+        rootDirCode: string | undefined = undefined, expectedRootName: string | undefined = undefined) {
         dirPath = normalizeWinPath(dirPath);
-        const withExpectedRootDirReplace = expectedRootDirReplace && expectedRootDirReplace.length > 0;
-        const expectedRootPathReplace = withExpectedRootDirReplace ? asRoot(expectedRootDirReplace) : "";
-        let dirPathPart = expectedRootDir ? dirPath.substring(expectedRootDir.length, dirPath.length) : dirPath;
+        // const withExpectedRootDirReplace = rootDirCode && rootDirCode.length > 0;
+        // const expectedRootPathReplace = withExpectedRootDirReplace ? asRoot(rootDirCode) : "";
+        let dirPathPart = dirPath;
+        let stripped = false;
+        // if (expectedRootDir) {
+        //     dirPathPart = expectedRootDir ? dirPath.substring(expectedRootDir.length, dirPath.length) : dirPath;
+        //     stripped = true;
+        // }
         let root: DirectoryHierarchyBuilder | undefined;
         let findFiles = true;
         for (; dirPathPart.length > 0;) {
@@ -94,7 +98,7 @@ export class DirectoryHierarchyBuilder {
                 break;
             }
             const path = join(parentParentDir, name);
-            const fullPath = withExpectedRootDirReplace ? join(expectedRootPathReplace, path) : path;
+            const fullPath = /*withExpectedRootDirReplace ? join(expectedRootPathReplace, path) :*/ path;
             const newRoot = new DirectoryHierarchyBuilder(false, name, fullPath, new Map(), findFiles);
             if (root) {
                 newRoot.subdirs.set(root.name, root);
@@ -105,8 +109,10 @@ export class DirectoryHierarchyBuilder {
         }
 
         const sub = root;
-        const rootPath = expectedRootPathReplace.length > 0 ? expectedRootPathReplace : dirPathPart;
-        const rootName = expectedRootName && expectedRootName.length > 0 ? expectedRootName : dirPathPart;
+        const rootPath = (stripped ? expectedRootDir : dirPathPart) || '';
+        const rootName = dirPathPart === path.sep ? '' : dirPathPart;
+        // const rootPath = /*expectedRootPathReplace.length > 0 ? expectedRootPathReplace :*/ dirPathPart;
+        // const rootName = /*expectedRootName && expectedRootName.length > 0 ? expectedRootName :*/ dirPathPart;
         root = new DirectoryHierarchyBuilder(true, rootName, rootPath, new Map());
         if (sub) {
             root.subdirs.set(sub.name, sub);
@@ -133,9 +139,9 @@ export class DirectoryHierarchyBuilder {
 const isWin = process.platform === "win32";
 
 function asRoot(expectedRootDirReplace: string) {
-    return expectedRootDirReplace.startsWith(path.sep) 
-    ? expectedRootDirReplace 
-    : path.join(path.sep, expectedRootDirReplace);
+    return expectedRootDirReplace.startsWith(path.sep)
+        ? expectedRootDirReplace
+        : path.join(path.sep, expectedRootDirReplace);
 }
 
 export function normalizeWinPath(dirPath: string) {
@@ -149,7 +155,7 @@ export function normalizeWinPath(dirPath: string) {
     return dirPath;
 }
 
-function collapse(name: string, dir: DirectoryHierarchyBuilder, collapseSelf: boolean = false): [string, DirectoryHierarchyBuilder] {
+function collapse(name: string, dir: DirectoryHierarchyBuilder, collapseSelf: boolean = true): [string, DirectoryHierarchyBuilder] {
     const subdirs = dir.subdirs;
     const single = subdirs.size === 1;
     if (!(collapseSelf && single)) {

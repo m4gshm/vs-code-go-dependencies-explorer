@@ -32,14 +32,11 @@ export class GoPackageProvider implements Disposable {
 
 export interface GoStdLibPakages {
     root: Directory;
-    // flatDirs: Map<string, Directory>;
 }
 
 export interface GoModuleDirs {
     root: Directory;
-    // flatDirs: Map<string, Directory>;
     rootReplaced: Directory | undefined;
-    // flatReplaced: Map<string, Directory>;
 }
 
 async function getGoPackages(goExec: GoExec): Promise<[GoStdLibPakages, GoModuleDirs]> {
@@ -54,9 +51,7 @@ async function getGoPackages(goExec: GoExec): Promise<[GoStdLibPakages, GoModule
         const stdGoPackageDirs = getPackageDirs(stdLibPath);
         const label = 'Standard library';
         const root = DirectoryHierarchyBuilder.create(stdGoPackageDirs, stdLibPath, ROOT_STD_LIB, label)!!.toDirectory();
-        // const flatDirs = flat([root]);
-
-        return { root/*, flatDirs*/ };
+        return { root };
     };
 
     const getGoModuleDirs = async () => {
@@ -109,11 +104,8 @@ async function getGoPackages(goExec: GoExec): Promise<[GoStdLibPakages, GoModule
         const replacedPackageDirs = replacedDirs.map(d => getPackageDirs(d)).flatMap(dd => dd);
 
         const root = DirectoryHierarchyBuilder.create(modulePackageDirs, extPackagesDir, ROOT_MODULES, 'External packages')!!.toDirectory();
-        const rootReplaced = DirectoryHierarchyBuilder.create(replacedPackageDirs, undefined, undefined, undefined, true)?.toDirectory();
-        // const flatDirs = flat([root]);
-        // const flatReplaced = rootReplaced ? flat([rootReplaced]) : new Map<string, Directory>();
-
-        return { root/*, flatDirs*/, rootReplaced/*, flatReplaced*/ };
+        const rootReplaced = DirectoryHierarchyBuilder.create(replacedPackageDirs, undefined, undefined, undefined)?.toDirectory();
+        return { root, rootReplaced};
     };
 
     return [getGoStdLibDirs(), await getGoModuleDirs()];

@@ -5,7 +5,8 @@ import {
   TreeItem,
   Uri, window, workspace,
   ExtensionContext,
-  TreeDataProvider, Event
+  TreeDataProvider, Event,
+  WorkspaceFolder
 } from 'vscode';
 import { dependencyUri, FileItem, GoTreeItemProvider, GoDirItem } from './goTreeItemProvider';
 
@@ -54,21 +55,37 @@ export async function createTreeView(ctx: ExtensionContext, uriConv: FsUriConver
       const textInput = input instanceof TabInputText ? input as TabInputText : undefined;
       if (textInput) {
         const fileUri = textInput.uri;
-        const depUri = uriConv.toDepUri(fileUri);
-        if (depUri) {
-          const fsPath = depUri.fsPath;
+        const workspaceFolders = workspace.workspaceFolders;
+        const workspaceFolder = workspaceFolders?.find(folder => {
+          const found = fileUri.fsPath.startsWith(folder.uri.fsPath);
+          return found;
+        });
+        if (workspaceFolder) {
+          console.trace(`the active tab belongs to the workspace: ${fileUri}`);
+        } else {
+          const fsPath = fileUri.fsPath;
           const filePath = parse(fsPath);
           const dir = filePath.dir;
           const isPackageDir = treeProvider.findDir(dir) !== undefined;
-          if (isPackageDir) {
-            commands.executeCommand("workbench.action.files.setActiveEditorReadonlyInSession");
-            const openPath = depUri.fsPath;
-            treeView.reveal({
-              id: openPath,
-              focus: true,
-              select: true,
-            } as TreeItem);
-          }
+          // const depUri = uriConv.toDepUri(fileUri);
+          // if (depUri) {
+            // const fsPath = depUri.fsPath;
+            // const filePath = parse(fsPath);
+            // const dir = filePath.dir;
+            // const isPackageDir = treeProvider.findDir(dir) !== undefined;
+            if (isPackageDir) {
+              console.debug(`set readonly dependency file ${fileUri}`);
+              //workbench.action.files.resetActiveEditorReadonlyInSession
+              commands.executeCommand("workbench.action.files.setActiveEditorReadonlyInSession");
+              // const openPath = depUri.fsPath;
+              const openPath = fsPath;
+              treeView.reveal({
+                id: openPath,
+                focus: true,
+                select: true,
+              } as TreeItem);
+            }
+          // }
         }
       }
     }
@@ -148,12 +165,13 @@ export class GoTreeDataProvider implements TreeDataProvider<TreeItem> {
         return children;
       } else {
         const dir = element.dir;
+        const newUri =  Uri.file(dir.path);
         const dirUri = dependencyUri(dir.path);
-        const newUri = this.uriConv.toFsUri(dirUri);
-        if (!newUri) {
-          throw new Error(`Bad dependency dir "${dirUri}"`);
-        }
-        const dirContent = dir.findFiles ? await workspace.fs.readDirectory(newUri) : [];
+        // const newUri = this.uriConv.toFsUri(dirUri);
+        // if (!newUri) {
+          // throw new Error(`Bad dependency dir "${dirUri}"`);
+        // }
+        const dirContent = dir.findFiles ? await workspace.fs.readDirectory(dirUri) : [];
         const files = dirContent.filter(([_, type]) => {
           return type !== FileType.Directory;
         }).map(([filename, _]) => {

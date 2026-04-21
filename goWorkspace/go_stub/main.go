@@ -8,3 +8,4 @@ import "replaced_package"
 func main() {
 	fmt.Print("Hello World!", replaced_package.FOO)
 }
+

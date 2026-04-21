@@ -2,7 +2,7 @@ import { TreeItem, TreeItemCollapsibleState, Uri } from "vscode";
 import { Directory, flat } from "./directory";
 import { GoPackageProvider } from "./goPackageProvider";
 import { join } from 'path';
-import { SCHEME } from "./goDependenciesFsCommon";
+import { ROOT_STD_LIB, SCHEME } from "./goDependenciesFsCommon";
 
 export class GoTreeItemProvider {
     private _stdLibRootDir!: GoDirItem;
@@ -34,8 +34,7 @@ export class GoTreeItemProvider {
 
         const [std, modules] = await this.packageProvider.getPackages();
 
-        this._stdLibRootDir = newGoDirItem(std.root);
-
+        this._stdLibRootDir = newGoDirItem(std.root, ROOT_STD_LIB);
         this._stdLibDirs = convertToGoDirs(flat([std.root]));
 
         this._modulesRootDir = newGoDirItem(modules.root);
@@ -51,12 +50,13 @@ export class GoTreeItemProvider {
 export class GoDirItem extends TreeItem {
     constructor(
         public readonly dir: Directory,
+        label: string | undefined = undefined,
         public children: TreeItem[] | undefined = undefined
     ) {
-        super(dir.label, TreeItemCollapsibleState.Collapsed);
+        super(label || dir.name, TreeItemCollapsibleState.Collapsed);
         this.id = dir.path;
         this.collapsibleState = TreeItemCollapsibleState.Collapsed;
-        this.tooltip = dir.label;
+        this.tooltip = dir.name;
     }
 }
 
@@ -73,8 +73,8 @@ export class FileItem extends TreeItem {
     }
 }
 
-export function newGoDirItem(dir: Directory) {
-    return new GoDirItem(dir);
+export function newGoDirItem(dir: Directory, label: string | undefined = undefined) {
+    return new GoDirItem(dir, label);
 }
 
 export function dependencyUri(path: string) {

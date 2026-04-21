@@ -10,11 +10,11 @@ suite('Directory', () => {
     const subdirs = [new Directory('sub1', '/path/sub1', true, [])];
     const dir = new Directory('test', '/path/test', false, subdirs);
 
-    assert.strictEqual(dir.label, 'test');
+    assert.strictEqual(dir.name, 'test');
     assert.strictEqual(dir.path, '/path/test');
     assert.strictEqual(dir.findFiles, false);
     assert.strictEqual(dir.subdirs.length, 1);
-    assert.strictEqual(dir.subdirs[0].label, 'sub1');
+    assert.strictEqual(dir.subdirs[0].name, 'sub1');
   });
 });
 
@@ -67,7 +67,7 @@ suite('DirectoryHierarchyBuilder', () => {
       const expectedRoot = path.sep + ROOT_STD_LIB;
       assert.strictEqual(root.path, expectedRoot);
       assert.strictEqual(root.subdirs.length, 1);
-      assert.strictEqual(root.subdirs[0].label, 'dir1');
+      assert.strictEqual(root.subdirs[0].name, 'dir1');
       assert.strictEqual(root.subdirs[0].path, path.join(expectedRoot, 'dir1'));
     });
 
@@ -81,7 +81,7 @@ suite('DirectoryHierarchyBuilder', () => {
       const expectedRoot = path.sep + ROOT_STD_LIB;
       assert.strictEqual(expectedRoot, root.path);
       assert.strictEqual(2, root.subdirs.length);
-      assert.strictEqual('dir1', root.subdirs[0].label);
+      assert.strictEqual('dir1', root.subdirs[0].name);
       assert.strictEqual(path.join(expectedRoot, 'dir1'), root.subdirs[0].path);
       assert.strictEqual(path.join(expectedRoot, 'dir1', 'subdir11'), root.subdirs[0].subdirs[0].path);
 
@@ -100,12 +100,12 @@ suite('DirectoryHierarchyBuilder', () => {
       assert(root.path === '/' || root.path === path.sep);
       assert.strictEqual(root.subdirs.length, 1);
       const first = root.subdirs[0];
-      assert.strictEqual(first.label, 'absolute');
+      assert.strictEqual(first.name, 'absolute');
       // The path could be '/absolute' or '\absolute' depending on platform
       assert(first.path.endsWith('absolute'));
       // Continue down the hierarchy
       assert.strictEqual(first.subdirs.length, 1);
-      assert.strictEqual(first.subdirs[0].label, 'path');
+      assert.strictEqual(first.subdirs[0].name, 'path');
       assert(first.subdirs[0].path.endsWith(path.join('absolute', 'path')));
     });
 
@@ -126,17 +126,17 @@ suite('DirectoryHierarchyBuilder', () => {
       // Only /root/dir1 should be included
       const expectedRoot = path.sep + ROOT_STD_LIB;
       assert.strictEqual(root.subdirs.length, 1);
-      assert.strictEqual(root.subdirs[0].label, 'dir1');
+      assert.strictEqual(root.subdirs[0].name, 'dir1');
     });
 
     test('collapseFirst parameter', () => {
       const dirPaths = ['/root/dir1/subdir11'];
       // With collapseFirst=true, the hierarchy may be collapsed
-      const root = DirectoryHierarchyBuilder.create(dirPaths, '/root', ROOT_STD_LIB, "Test", true)!!.toDirectory();
+      const root = DirectoryHierarchyBuilder.create(dirPaths, '/root', ROOT_STD_LIB, "Test")!!.toDirectory();
 
       // Just verify we get a valid directory structure
       assert.strictEqual(typeof root.path, 'string');
-      assert.strictEqual(typeof root.label, 'string');
+      assert.strictEqual(typeof root.name, 'string');
       // The exact structure depends on collapse implementation
     });
   });
@@ -151,13 +151,13 @@ suite('DirectoryHierarchyBuilder', () => {
       const grouped = new Map([['/group1', ['dir1', 'dir2']]]);
       const result = DirectoryHierarchyBuilder.createGrouped(grouped, '/root', 'Root')!!.toDirectory();
 
-      assert.strictEqual(result.label, 'Root');
+      assert.strictEqual(result.name, 'Root');
       assert.strictEqual(result.subdirs.length, 1);
       const group = result.subdirs[0];
-      assert.strictEqual(group.label, '/group1');
+      assert.strictEqual(group.name, '/group1');
       assert.strictEqual(group.subdirs.length, 2);
-      assert.strictEqual(group.subdirs[0].label, 'dir1');
-      assert.strictEqual(group.subdirs[1].label, 'dir2');
+      assert.strictEqual(group.subdirs[0].name, 'dir1');
+      assert.strictEqual(group.subdirs[1].name, 'dir2');
       assert.strictEqual(group.subdirs[0].findFiles, true); // Leaf directories have findFiles=true
       assert.strictEqual(group.findFiles, false); // Group directory has findFiles=false
     });
@@ -170,8 +170,8 @@ suite('DirectoryHierarchyBuilder', () => {
       const result = DirectoryHierarchyBuilder.createGrouped(grouped, '/root', 'Root')!!.toDirectory();
 
       assert.strictEqual(result.subdirs.length, 2);
-      assert.strictEqual(result.subdirs[0].label, '/group1');
-      assert.strictEqual(result.subdirs[1].label, '/group2');
+      assert.strictEqual(result.subdirs[0].name, '/group1');
+      assert.strictEqual(result.subdirs[1].name, '/group2');
     });
   });
 
@@ -188,7 +188,7 @@ suite('DirectoryHierarchyBuilder', () => {
       // The root has subdirectories dir1 and dir2 under it
       // Note: The root label is 'Root', not 'root'
       assert.strictEqual(result.subdirs.length, 2);
-      const labels = result.subdirs.map(d => d.label).sort();
+      const labels = result.subdirs.map(d => d.name).sort();
       assert.deepStrictEqual(labels, ['dir1', 'dir2']);
     });
 
@@ -202,9 +202,9 @@ suite('DirectoryHierarchyBuilder', () => {
       // Should have root with dir1 containing two subdirectories
       assert.strictEqual(result.subdirs.length, 1);
       const dir1 = result.subdirs[0];
-      assert.strictEqual(dir1.label, 'dir1');
+      assert.strictEqual(dir1.name, 'dir1');
       assert.strictEqual(dir1.subdirs.length, 2);
-      const subLabels = dir1.subdirs.map(d => d.label).sort();
+      const subLabels = dir1.subdirs.map(d => d.name).sort();
       assert.deepStrictEqual(subLabels, ['other', 'subdir']);
     });
   });
@@ -219,11 +219,11 @@ suite('DirectoryHierarchyBuilder', () => {
       );
 
       const directory = builder.toDirectory();
-      assert.strictEqual(directory.label, 'root');
+      assert.strictEqual(directory.name, 'root');
       assert.strictEqual(directory.path, '/root');
       assert.strictEqual(directory.findFiles, false);
       assert.strictEqual(directory.subdirs.length, 1);
-      assert.strictEqual(directory.subdirs[0].label, 'child');
+      assert.strictEqual(directory.subdirs[0].name, 'child');
       assert.strictEqual(directory.subdirs[0].findFiles, true);
     });
   });

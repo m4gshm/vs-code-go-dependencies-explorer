@@ -34,10 +34,10 @@ suite('GoTreeItemProvider Test Suite', () => {
 
         assert.equal(path.sep + ROOT_STD_LIB, rootDirs[0].id);
         assert.equal(path.sep + ROOT_STD_LIB, rootDirs[0].dir.path);
-        assert.equal('Standard library', rootDirs[0].dir.label);
+        assert.equal('Standard library', rootDirs[0].dir.name);
         assert.equal(path.sep + ROOT_MODULES, rootDirs[1].id);
         assert.equal(path.sep + ROOT_MODULES, rootDirs[1].dir.path);
-        assert.equal('External packages', rootDirs[1].dir.label);
+        assert.equal('External packages', rootDirs[1].dir.name);
     });
 
     test('findDir returns directory for known path', async () => {

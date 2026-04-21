@@ -1,0 +1,11 @@
+{
+	"folders": [
+		{
+			"path": "go_stub"
+		},
+		{
+			"path": "replaced_package"
+		}
+	],
+	"settings": {}
+}
