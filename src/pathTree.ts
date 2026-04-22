@@ -132,7 +132,9 @@ function collapseSubdirs(path: PathTreeBuilder): [string, PathTreeBuilder] {
         ? join(path.path, path.name, collapsedSubdirName)
         : join(path.name, collapsedSubdirName);
     collapsedSubdir.root = root;
-    collapsedSubdir.leafBranch = path.leafBranch;
+    if (path.leafBranch) {
+        collapsedSubdir.leafBranch = true;
+    }
     collapsedSubdir.name = collapsedSubPath;
     return [collapsedSubPath, collapsedSubdir];
 }

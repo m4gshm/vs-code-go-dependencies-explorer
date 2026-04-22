@@ -117,7 +117,6 @@ async function activateWithGo(context: vscode.ExtensionContext, goExtensionApi: 
             await execCommandOnItem('revealFileInOS', item);
         }));
     });
-    context.subscriptions.push(commands.registerCommand('go.dependencies.refresh', async () => await treeProvider.refresh()));
 
     console.log('Go Dependencies Explorer activated');
     activated = true;

@@ -105,6 +105,7 @@ suite('pathTree', () => {
 
         assert.strictEqual(root.path, sep('/absolute/path/to/dir'));
         assert.strictEqual(root.children.length, 0);
+        assert.strictEqual(root.exposeFiles, true);
       });
 
       test('collapse by default with multiple paths', () => {
@@ -116,6 +117,7 @@ suite('pathTree', () => {
         const root = PathTreeBuilder.create(paths)!!.toDirectory();
 
         assert.strictEqual(root.path, sep('/absolute/path'));
+        assert.strictEqual(root.exposeFiles, true);
         assert.strictEqual(root.children.length, 1);
 
         const subChildren = root.children;
@@ -123,13 +125,16 @@ suite('pathTree', () => {
 
         const subChild = subChildren[0];
         assert.strictEqual(subChild.name, 'to');
+        assert.strictEqual(subChild.exposeFiles, false);
         assert.strictEqual(subChild.path, sep('/absolute/path/to'));
 
         const subSubChildren = subChild.children;
         assert.strictEqual(subSubChildren.length, 2);
         assert.strictEqual(subSubChildren[0].name, 'dir');
+        assert.strictEqual(subSubChildren[0].exposeFiles, true);
         assert.strictEqual(subSubChildren[0].path, sep('/absolute/path/to/dir'));
         assert.strictEqual(subSubChildren[1].name, 'dir2');
+        assert.strictEqual(subSubChildren[1].exposeFiles, true);
         assert.strictEqual(subSubChildren[1].path, sep('/absolute/path/to/dir2'));
       });
 
@@ -150,16 +155,6 @@ suite('pathTree', () => {
         assert.strictEqual(root.children[0].name, 'dir1');
       });
 
-      test('collapseFirst parameter', () => {
-        const paths = ['/root/dir1/subdir11'];
-        // With collapseFirst=true, the hierarchy may be collapsed
-        const root = PathTreeBuilder.create(paths, '/root')!!.toDirectory();
-
-        // Just verify we get a valid directory structure
-        assert.strictEqual(typeof root.path, 'string');
-        assert.strictEqual(typeof root.name, 'string');
-        // The exact structure depends on collapse implementation
-      });
     });
 
     suite('merge', () => {
