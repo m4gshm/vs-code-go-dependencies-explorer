@@ -36,8 +36,11 @@ export class GoTreeItemProvider {
         this._stdLibRootDir = newGoDirItem(std.root, 'Standard library');
         this._stdLibDirs = convertToGoDirs(flat([std.root]));
 
-        this._modulesRootDir = newGoDirItem(modules.root, 'External packages');
-        this._modulesDirs = convertToGoDirs(flat([modules.root]));
+        const root = modules.root;
+        if (root) {
+            this._modulesRootDir = newGoDirItem(root, 'External packages');
+            this._modulesDirs = convertToGoDirs(flat([root]));
+        }
 
         const rootReplaced = modules.rootReplaced;
         this._replacedRootDir = rootReplaced ? newGoDirItem(rootReplaced) : undefined;
@@ -56,6 +59,7 @@ export class GoDirItem extends TreeItem {
         this.id = dir.path;
         this.collapsibleState = TreeItemCollapsibleState.Collapsed;
         this.tooltip = dir.name;
+        this.contextValue = 'goDir';
     }
 }
 
@@ -70,6 +74,7 @@ export class FileItem extends TreeItem {
         //just file to render mime icon but prevent file name colorizing by Git extension 
         this.resourceUri = Uri.file(fileName);
         this.tooltip = fileName;
+        this.contextValue = 'goFile';
     }
 }
 

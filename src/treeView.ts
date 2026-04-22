@@ -159,17 +159,14 @@ export class GoTreeDataProvider implements TreeDataProvider<TreeItem> {
       } else {
         const dir = element.dir;
         const newUri = Uri.file(dir.path);
-        // const dirUri = this.uriConv.toDepUri(newUri);
-        // const newUri = this.uriConv.toFsUri(dirUri);
-        // if (!newUri) {
-        // throw new Error(`Bad dependency dir "${dirUri}"`);
-        // }
-        const dirContent = await workspace.fs.readDirectory(newUri);
+
+        const dirContent = dir.exposeFiles ? await workspace.fs.readDirectory(newUri) : [];
         const files = dirContent.filter(([_, type]) => {
           return type !== FileType.Directory;
         }).map(([filename, _]) => {
           return new FileItem(filename, dir.path!!);
         });
+
         const subdirs = dir.children.map(d => new GoDirItem(d));
         const newChildren = [...subdirs, ...files];
         element.children = newChildren;

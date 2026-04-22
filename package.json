@@ -88,6 +88,10 @@
       {
         "command": "go.dependencies.search.in.directory",
         "title": "Search in directory"
+      },
+      {
+        "command": "go.dependencies.open.in.workspace",
+        "title": "Open in Workspace"
       }
     ],
     "menus": {
@@ -109,11 +113,15 @@
           "command": "go.dependencies.copy.path"
         },
         {
-          "when": "view == 'go.dependencies.explorer'",
+          "when": "view == 'go.dependencies.explorer' && viewItem == goDir",
           "command": "go.dependencies.search.in.directory"
         },
         {
-          "when": "view == 'go.dependencies.explorer'",
+          "when": "view == 'go.dependencies.explorer' && viewItem == goDir",
+          "command": "go.dependencies.open.in.workspace"
+        },
+        {
+          "when": "view == 'go.dependencies.explorer' && viewItem == goDir",
           "command": "go.dependencies.open.in.integrated.terminal"
         },
         {

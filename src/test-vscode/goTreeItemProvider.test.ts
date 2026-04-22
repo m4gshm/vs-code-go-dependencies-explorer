@@ -29,19 +29,16 @@ suite('GoTreeItemProvider Test Suite', () => {
         assert.ok(rootDirs);
         assert.ok(Array.isArray(rootDirs));
 
-        assert.ok(rootDirs.length === 2);
+        assert.ok(rootDirs.length === 3);
 
-        assert.equal(path.sep + ROOT_STD_LIB, rootDirs[0].id);
-        assert.equal(path.sep + ROOT_STD_LIB, rootDirs[0].dir.path);
-        assert.equal('Standard library', rootDirs[0].dir.name);
-        assert.equal(path.sep + ROOT_MODULES, rootDirs[1].id);
-        assert.equal(path.sep + ROOT_MODULES, rootDirs[1].dir.path);
-        assert.equal('External packages', rootDirs[1].dir.name);
+        assert.equal('Standard library', rootDirs[0].label);
+        assert.equal('External packages', rootDirs[1].label);
     });
 
     test('findDir returns directory for known path', async () => {
         await provider!.refresh();
-        const knownPath = join(path.sep, ROOT_STD_LIB, 'fmt');
+        const stdLibPath = provider?.rootDirs[0].id || '';
+        const knownPath = join(stdLibPath, 'fmt');
         const dir = provider!.findDir(knownPath);
         assert.strictEqual(dir!!.dir.path, knownPath);
     });

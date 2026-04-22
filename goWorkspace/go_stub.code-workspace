@@ -4,6 +4,7 @@
 			"path": "go_stub"
 		},
 		{
+			"name": "replaced_package",
 			"path": "replaced_package"
 		}
 	],

@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { EventEmitter } from 'vscode';
+import { EventEmitter, workspace } from 'vscode';
 import { getGoBinPath, getGoExtensionAPI, GoExtensionAPI } from '../goExtension';
 import { GoExec } from '../goExec';
 import { GoPackageProvider } from '../goPackageProvider';
@@ -41,8 +41,9 @@ suite('GoTreeDataProvider Test Suite', () => {
         const children = await provider!.getChildren();
         assert.ok(children);
         assert.ok(Array.isArray(children));
-        assert.ok(children.length >= 2);
-        assert.ok(children.every(child => child.id && child.label));
+        assert.ok(children.length === 3);
+        assert.strictEqual('Standard library', children[0].label);
+        assert.strictEqual('External packages', children[1].label);
     });
 
     test('getChildren with GoDirItem returns subdirectories and files', async () => {

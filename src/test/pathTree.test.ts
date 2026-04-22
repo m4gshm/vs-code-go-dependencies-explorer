@@ -100,41 +100,37 @@ suite('pathTree', () => {
       });
 
       test('collapse by default', () => {
-        const paths = ['/absolute/path/to/dir/main.go'];
+        const paths = ['/absolute/path/to/dir'];
         const root = PathTreeBuilder.create(paths)!!.toDirectory();
 
-        assert(root.path === '/absolute/path/to/dir');
-        assert.strictEqual(root.children.length, 1);
+        assert.strictEqual(root.path, sep('/absolute/path/to/dir'));
+        assert.strictEqual(root.children.length, 0);
       });
 
       test('collapse by default with multiple paths', () => {
         const paths = [
-          '/absolute/path/to/dir/main.go',
-          '/absolute/path/to/dir2/main.go',
+          '/absolute/path/to/dir',
+          '/absolute/path/to/dir2',
           '/absolute/path',
         ];
         const root = PathTreeBuilder.create(paths)!!.toDirectory();
 
-        assert.strictEqual(root.path, '/absolute');
+        assert.strictEqual(root.path, sep('/absolute/path'));
         assert.strictEqual(root.children.length, 1);
 
-        const firstChild = root.children[0];
-        assert.strictEqual(firstChild.name, 'path');
-        assert.strictEqual(firstChild.path, '/absolute/path');
-
-        const subChildren = firstChild.children;
+        const subChildren = root.children;
         assert.strictEqual(subChildren.length, 1);
 
         const subChild = subChildren[0];
         assert.strictEqual(subChild.name, 'to');
-        assert.strictEqual(subChild.path, '/absolute/path/to');
+        assert.strictEqual(subChild.path, sep('/absolute/path/to'));
 
         const subSubChildren = subChild.children;
         assert.strictEqual(subSubChildren.length, 2);
         assert.strictEqual(subSubChildren[0].name, 'dir');
-        assert.strictEqual(subSubChildren[0].path, '/absolute/path/to/dir');
+        assert.strictEqual(subSubChildren[0].path, sep('/absolute/path/to/dir'));
         assert.strictEqual(subSubChildren[1].name, 'dir2');
-        assert.strictEqual(subSubChildren[1].path, '/absolute/path/to/dir2');
+        assert.strictEqual(subSubChildren[1].path, sep('/absolute/path/to/dir2'));
       });
 
       test('with expectedRootDirReplace', () => {
@@ -246,3 +242,8 @@ suite('pathTree', () => {
     });
   });
 });
+
+
+function sep(p: string) {
+  return p.replaceAll("/", path.sep);
+}

@@ -34,7 +34,7 @@ export interface GoStdLibTree {
 }
 
 export interface GoModuleTree {
-    root: PathElement;
+    root: PathElement | undefined;
     rootReplaced: PathElement | undefined;
 }
 
@@ -54,7 +54,7 @@ async function getGoPackages(goExec: GoExec): Promise<[GoStdLibTree, GoModuleTre
 
     const getGoModuleDirs = async () => {
         const extPackagesDir = getModulesPath(goExec.getEnv());
-
+        
         const rootDirs = (await workspace.findFiles(GO_MOD_PATTERN)).map(f => parse(f.fsPath).dir).map(dir => normalizeWinPath(dir));
         console.debug(`retrieving Go module directories ${rootDirs}`);
 
@@ -101,7 +101,7 @@ async function getGoPackages(goExec: GoExec): Promise<[GoStdLibTree, GoModuleTre
         console.debug(`retrieving Go replaced package dirs for module dirs ${replacedDirs}`);
         const replacedPackageDirs = replacedDirs.map(d => getPackageDirs(d)).flatMap(dd => dd);
 
-        const root = PathTreeBuilder.create(modulePackageDirs, extPackagesDir)!!.toDirectory();
+        const root = PathTreeBuilder.create(modulePackageDirs, extPackagesDir)?.toDirectory();
         const rootReplaced = PathTreeBuilder.create(replacedPackageDirs)?.toDirectory();
         return { root, rootReplaced };
     };

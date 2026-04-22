@@ -5,6 +5,7 @@ export class PathElement {
         public readonly name: string,
         public readonly path: string,
         public readonly children: PathElement[],
+        public readonly exposeFiles: boolean = false,
     ) { }
 }
 
@@ -30,14 +31,14 @@ export class PathTreeBuilder {
         public children: Map<string, PathTreeBuilder>,
     ) { }
 
-    public static create(filePaths: string[], rootDir: string | RootType = RootType.common) {
+    public static create(dirPaths: string[], rootDir: string | RootType = RootType.common) {
         const useRoot = typeof rootDir === "string";
         let root: PathTreeBuilder | undefined;
-        for (let filePath of filePaths) {
-            if (useRoot && !filePath.startsWith(rootDir)) {
-                console.warn(`path "${filePath}" must be start from "${rootDir}"`);
+        for (let dirPath of dirPaths) {
+            if (useRoot && !dirPath.startsWith(rootDir)) {
+                console.warn(`path "${dirPath}" must be start from "${rootDir}"`);
             } else {
-                const newRoot = PathTreeBuilder.newHierarchyBuilder(filePath, useRoot ? rootDir : undefined);
+                const newRoot = PathTreeBuilder.newHierarchyBuilder(dirPath, useRoot ? rootDir : undefined);
                 if (!root) {
                     root = newRoot;
                 } else if (newRoot && root.path === newRoot.path) {
@@ -54,16 +55,13 @@ export class PathTreeBuilder {
         }
     }
 
-    static newHierarchyBuilder(filePath: string, rootDir: string | undefined) {
-        filePath = normalizeWinPath(filePath);
+    static newHierarchyBuilder(dirPath: string, rootDir: string | undefined) {
+        dirPath = normalizeWinPath(dirPath);
         rootDir = rootDir ? normalizeWinPath(rootDir) : undefined;
-        let dirPathPart = filePath;
+        let dirPathPart = dirPath;
         let root: PathTreeBuilder | undefined;
         for (let i = 0; dirPathPart.length > 0; i++) {
-            // i === 0 means the dirPathPart is the full path, which is a leaf branch. 
-            // i === 1 means the dirPathPart is the parent of the full path, which is also a leaf branch if the full path is a file. 
-            // For i > 1, the dirPathPart is not a leaf branch.
-            let isLeafBranch = i === 1;
+            let isLeafBranch = i === 0;
 
             let newRoot: PathTreeBuilder;
             if (rootDir && dirPathPart === rootDir) {
@@ -105,7 +103,7 @@ export class PathTreeBuilder {
     }
 
     public toDirectory(): PathElement {
-        return new PathElement(this.name, this.path, Array.from(this.children.values()).map(d => d.toDirectory()));
+        return new PathElement(this.name, this.path, Array.from(this.children.values()).map(d => d.toDirectory()), this.leafBranch);
     }
 }
 

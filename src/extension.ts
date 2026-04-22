@@ -5,9 +5,9 @@ import { getGoBinPath, getGoExtensionAPI, GoExtensionAPI } from './goExtension';
 import { GitExtension } from './gitExtension';
 import { GoPackageProvider } from './goPackageProvider';
 import { getGoPackagePaths } from './goDirs';
-import { commands } from 'vscode';
+import { commands, Uri, workspace } from 'vscode';
 import { IFindInFilesArgs } from './search';
-import { GoTreeItemProvider } from './goTreeItemProvider';
+import { GoDirItem, GoTreeItemProvider } from './goTreeItemProvider';
 
 let activated: boolean;
 
@@ -92,6 +92,18 @@ async function activateWithGo(context: vscode.ExtensionContext, goExtensionApi: 
             } as IFindInFilesArgs);
         }
     }));
+
+    context.subscriptions.push(commands.registerCommand('go.dependencies.open.in.workspace', async item => {
+        if (item instanceof GoDirItem) {
+            const path = item.id;
+            const uri = path ? Uri.file(path) : undefined;
+            if (uri) {
+                const workspaceFolders = workspace.workspaceFolders;
+                workspace.updateWorkspaceFolders(workspaceFolders ? workspaceFolders.length : 0, null, { uri: uri, });
+            }
+        }
+    }));
+
     context.subscriptions.push(commands.registerCommand('go.dependencies.copy.path', async item => {
         await execCommandOnItem('copyFilePath', item);
     }));
