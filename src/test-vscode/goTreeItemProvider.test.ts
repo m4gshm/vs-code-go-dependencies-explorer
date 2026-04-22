@@ -4,7 +4,6 @@ import { getGoBinPath, getGoExtensionAPI, GoExtensionAPI } from '../goExtension'
 import { GoExec } from '../goExec';
 import { GoPackageProvider } from '../goPackageProvider';
 import { GoTreeItemProvider } from '../goTreeItemProvider';
-import { normalizeWinPath } from '../directory';
 import { ROOT_MODULES, ROOT_STD_LIB } from '../goDependenciesFsCommon';
 
 suite('GoTreeItemProvider Test Suite', () => {

@@ -3,7 +3,7 @@ import { join } from 'path';
 import { getGoBinPath, getGoExtensionAPI, GoExtensionAPI } from '../goExtension';
 import { GoExec } from '../goExec';
 import { getModulesPath, getStdLibPath } from '../goDirs';
-import { normalizeWinPath } from '../directory';
+import { normalizeWinPath } from '../pathTree';
 
 suite('GoExec Test Suite', () => {
   const workDir = join(__dirname, '../../goWorkspace/go_stub');

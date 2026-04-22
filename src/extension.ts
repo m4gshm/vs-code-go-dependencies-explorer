@@ -2,14 +2,12 @@ import * as vscode from 'vscode';
 import { createTreeView, getFsUriOfSelectedItem } from "./treeView";
 import { GoExec } from './goExec';
 import { getGoBinPath, getGoExtensionAPI, GoExtensionAPI } from './goExtension';
-import { FsUriConverter, GoDependenciesFileSystemProvider, newFsUriConverter } from './goDependenciesFsProvider';
 import { GitExtension } from './gitExtension';
 import { GoPackageProvider } from './goPackageProvider';
 import { getGoPackagePaths } from './goDirs';
 import { commands } from 'vscode';
 import { IFindInFilesArgs } from './search';
 import { GoTreeItemProvider } from './goTreeItemProvider';
-import { SCHEME } from './goDependenciesFsCommon';
 
 let activated: boolean;
 
@@ -68,18 +66,14 @@ async function activateWithGo(context: vscode.ExtensionContext, goExtensionApi: 
     }
 
     const goPackDirProvider = new GoPackageProvider(goExec);
-    const uriConv = newFsUriConverter(goPackDirProvider);
-    const fsProvider = new GoDependenciesFileSystemProvider(vscode.workspace.fs, uriConv.toFsUri);
-
-    context.subscriptions.push(vscode.workspace.registerFileSystemProvider(SCHEME, fsProvider, { isReadonly: true }));
 
     const treeProvider = await GoTreeItemProvider.new(goPackDirProvider);
 
-    await createTreeView(context, uriConv, treeProvider);
+    await createTreeView(context, treeProvider);
 
     context.subscriptions.push(commands.registerCommand('go.dependencies.search.in.all.directories', async _ => {
         const rootDirs = treeProvider.rootDirs;
-        const dirs = rootDirs.map(dir => getFsUriOfSelectedItem(dir, uriConv))
+        const dirs = rootDirs.map(dir => getFsUriOfSelectedItem(dir))
             .filter(d => d !== undefined).map(uri => uri.fsPath)
             .reduce((l, r) => l + "," + r);
 
@@ -90,7 +84,7 @@ async function activateWithGo(context: vscode.ExtensionContext, goExtensionApi: 
     }));
 
     context.subscriptions.push(commands.registerCommand('go.dependencies.search.in.directory', async item => {
-        const uri = getFsUriOfSelectedItem(item, uriConv);
+        const uri = getFsUriOfSelectedItem(item);
         if (uri) {
             await commands.executeCommand("workbench.action.findInFiles", {
                 filesToInclude: uri.fsPath,
@@ -99,16 +93,16 @@ async function activateWithGo(context: vscode.ExtensionContext, goExtensionApi: 
         }
     }));
     context.subscriptions.push(commands.registerCommand('go.dependencies.copy.path', async item => {
-        await execCommandOnItem('copyFilePath', item, uriConv);
+        await execCommandOnItem('copyFilePath', item);
     }));
 
     context.subscriptions.push(commands.registerCommand('go.dependencies.open.in.integrated.terminal', async item => {
-        await execCommandOnItem('openInIntegratedTerminal', item, uriConv);
+        await execCommandOnItem('openInIntegratedTerminal', item);
     }));
 
     ['mac', 'windows', 'linux'].forEach(os => {
         context.subscriptions.push(commands.registerCommand(`go.dependencies.reveal.in.os.${os}`, async item => {
-            await execCommandOnItem('revealFileInOS', item, uriConv);
+            await execCommandOnItem('revealFileInOS', item);
         }));
     });
     context.subscriptions.push(commands.registerCommand('go.dependencies.refresh', async () => await treeProvider.refresh()));
@@ -122,8 +116,8 @@ export function deactivate() {
     activated = false;
 }
 
-async function execCommandOnItem(command: string, item: any, uriConv: FsUriConverter) {
-    let uri = getFsUriOfSelectedItem(item, uriConv);
+async function execCommandOnItem(command: string, item: any) {
+    let uri = getFsUriOfSelectedItem(item);
     if (uri) {
         await commands.executeCommand(command, uri);
     }

@@ -1,4 +1,4 @@
-import { normalizeWinPath } from "./directory";
+import { normalizeWinPath } from "./pathTree";
 import { join } from 'path';
 import { GoExec } from "./goExec";
 

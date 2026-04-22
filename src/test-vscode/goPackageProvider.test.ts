@@ -3,7 +3,7 @@ import { join } from 'path';
 import { getGoBinPath, getGoExtensionAPI, GoExtensionAPI } from '../goExtension';
 import { GoExec } from '../goExec';
 import { GoPackageProvider } from '../goPackageProvider';
-import { normalizeWinPath } from '../directory';
+import { normalizeWinPath } from '../pathTree';
 
 suite('GoPackageProvider Test Suite', () => {
     let goExtensionApi: GoExtensionAPI | undefined;

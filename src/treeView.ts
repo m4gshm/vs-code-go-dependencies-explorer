@@ -1,35 +1,37 @@
-import { parse, join } from 'path';
-import { FsUriConverter } from './goDependenciesFsProvider';
+import { parse } from 'path';
 import {
   commands, EventEmitter, FileType, GlobPattern, Tab, TabInputText,
   TreeItem,
   Uri, window, workspace,
   ExtensionContext,
   TreeDataProvider, Event,
-  WorkspaceFolder
 } from 'vscode';
-import { dependencyUri, FileItem, GoTreeItemProvider, GoDirItem } from './goTreeItemProvider';
+import { FileItem, GoTreeItemProvider, GoDirItem } from './goTreeItemProvider';
 
-export async function createTreeView(ctx: ExtensionContext, uriConv: FsUriConverter, treeProvider: GoTreeItemProvider) {
+export async function createTreeView(ctx: ExtensionContext, treeProvider: GoTreeItemProvider) {
   const onDidChangeTreeData = new EventEmitter<undefined>();
 
   const subscriptions = ctx.subscriptions;
   subscriptions.push(onDidChangeTreeData);
 
   const treeView = window.createTreeView("go.dependencies.explorer", {
-    showCollapseAll: true, treeDataProvider: new GoTreeDataProvider(onDidChangeTreeData, uriConv, treeProvider),
+    showCollapseAll: true, treeDataProvider: new GoTreeDataProvider(onDidChangeTreeData, treeProvider),
   });
   subscriptions.push(treeView);
 
   subscriptions.push(treeView.onDidChangeSelection(async event => {
     const selections = event.selection;
     for (const selection of selections) {
-      const fileUri = selection.resourceUri;
-      if (fileUri) {
-        const newUri = uriConv.toFsUri(fileUri);
-        await workspace.openTextDocument(newUri || fileUri).then(
-          document => window.showTextDocument(document)
-        );
+      if (selection instanceof FileItem) {
+        const id = selection.id;
+        if (id) {
+          const fileUri = Uri.file(id);
+          await workspace.openTextDocument(fileUri).then(
+            document => window.showTextDocument(document)
+          );
+        } else {
+          console.warn(`selected FileItem withoud id ${selection}`);
+        }
       }
     }
   }));
@@ -60,32 +62,22 @@ export async function createTreeView(ctx: ExtensionContext, uriConv: FsUriConver
           const found = fileUri.fsPath.startsWith(folder.uri.fsPath);
           return found;
         });
-        if (workspaceFolder) {
-          console.trace(`the active tab belongs to the workspace: ${fileUri}`);
-        } else {
+        if (!workspaceFolder) {
           const fsPath = fileUri.fsPath;
           const filePath = parse(fsPath);
           const dir = filePath.dir;
           const isPackageDir = treeProvider.findDir(dir) !== undefined;
-          // const depUri = uriConv.toDepUri(fileUri);
-          // if (depUri) {
-            // const fsPath = depUri.fsPath;
-            // const filePath = parse(fsPath);
-            // const dir = filePath.dir;
-            // const isPackageDir = treeProvider.findDir(dir) !== undefined;
-            if (isPackageDir) {
-              console.debug(`set readonly dependency file ${fileUri}`);
-              //workbench.action.files.resetActiveEditorReadonlyInSession
-              commands.executeCommand("workbench.action.files.setActiveEditorReadonlyInSession");
-              // const openPath = depUri.fsPath;
-              const openPath = fsPath;
-              treeView.reveal({
-                id: openPath,
-                focus: true,
-                select: true,
-              } as TreeItem);
-            }
-          // }
+          if (isPackageDir) {
+            console.debug(`set readonly dependency file ${fileUri}`);
+            //workbench.action.files.resetActiveEditorReadonlyInSession
+            commands.executeCommand("workbench.action.files.setActiveEditorReadonlyInSession");
+            const openPath = fsPath;
+            treeView.reveal({
+              id: openPath,
+              focus: true,
+              select: true,
+            } as TreeItem);
+          }
         }
       }
     }
@@ -125,22 +117,24 @@ export async function createTreeView(ctx: ExtensionContext, uriConv: FsUriConver
   commands.executeCommand('setContext', 'go.dependencies.explorer.show', true);
 }
 
-export function getFsUriOfSelectedItem(item: any, uriConv: FsUriConverter) {
+export function getFsUriOfSelectedItem(item: any) {
   let uri: Uri | undefined;
   if (item instanceof FileItem) {
-    uri = dependencyUri(join(item.filePath, item.fileName));
+    const path = item.id;
+    if (path) {
+      uri = Uri.file(path);
+    } else {
+      console.warn("undefined path of file item:", item);
+    }
   } else if (item instanceof GoDirItem) {
     const path = item.id;
     if (path) {
-      uri = dependencyUri(path);
+      uri = Uri.file(path);
     } else {
-      console.warn("undefined path of item: " + item);
+      console.warn("undefined path of dir item:", item);
     }
   } else {
-    console.warn("unexpected item type: " + item);
-  }
-  if (uri) {
-    uri = uriConv.toFsUri(uri);
+    console.warn("unexpected item type:", item);
   }
   return uri;
 }
@@ -150,7 +144,6 @@ export class GoTreeDataProvider implements TreeDataProvider<TreeItem> {
 
   constructor(
     _onDidChangeTreeData: EventEmitter<TreeItem | undefined>,
-    private uriConv: FsUriConverter,
     private treeProvider: GoTreeItemProvider
   ) {
     this.onDidChangeTreeData = _onDidChangeTreeData.event;
@@ -165,19 +158,19 @@ export class GoTreeDataProvider implements TreeDataProvider<TreeItem> {
         return children;
       } else {
         const dir = element.dir;
-        const newUri =  Uri.file(dir.path);
-        const dirUri = dependencyUri(dir.path);
+        const newUri = Uri.file(dir.path);
+        // const dirUri = this.uriConv.toDepUri(newUri);
         // const newUri = this.uriConv.toFsUri(dirUri);
         // if (!newUri) {
-          // throw new Error(`Bad dependency dir "${dirUri}"`);
+        // throw new Error(`Bad dependency dir "${dirUri}"`);
         // }
-        const dirContent = dir.findFiles ? await workspace.fs.readDirectory(dirUri) : [];
+        const dirContent = await workspace.fs.readDirectory(newUri);
         const files = dirContent.filter(([_, type]) => {
           return type !== FileType.Directory;
         }).map(([filename, _]) => {
           return new FileItem(filename, dir.path!!);
         });
-        const subdirs = dir.subdirs.map(d => new GoDirItem(d));
+        const subdirs = dir.children.map(d => new GoDirItem(d));
         const newChildren = [...subdirs, ...files];
         element.children = newChildren;
         return newChildren;

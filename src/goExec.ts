@@ -1,7 +1,7 @@
 import cp from 'child_process';
 import fs from 'fs';
 import { URL } from 'url';
-import { normalizeWinPath } from './directory';
+import { normalizeWinPath } from './pathTree';
 
 export type WorkDir = string | URL | undefined;
 

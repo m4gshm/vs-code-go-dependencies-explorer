@@ -4,7 +4,6 @@ import { getGoBinPath, getGoExtensionAPI, GoExtensionAPI } from '../goExtension'
 import { GoExec } from '../goExec';
 import { GoPackageProvider } from '../goPackageProvider';
 import { GoTreeItemProvider } from '../goTreeItemProvider';
-import { FsUriConverter, newFsUriConverter } from '../goDependenciesFsProvider';
 import { GoTreeDataProvider } from '../treeView';
 
 suite('GoTreeDataProvider Test Suite', () => {
@@ -12,7 +11,6 @@ suite('GoTreeDataProvider Test Suite', () => {
     let goExec: GoExec | undefined;
     let goPackDirProvider: GoPackageProvider | undefined;
     let treeItemProvider: GoTreeItemProvider | undefined;
-    let uriConv: FsUriConverter | undefined;
     let eventEmitter: EventEmitter<any> | undefined;
     let provider: GoTreeDataProvider | undefined;
 
@@ -24,9 +22,8 @@ suite('GoTreeDataProvider Test Suite', () => {
             goExec = new GoExec(getGoBinPath(goExtensionApi));
             goPackDirProvider = new GoPackageProvider(goExec);
             treeItemProvider = await GoTreeItemProvider.new(goPackDirProvider);
-            uriConv = newFsUriConverter(goPackDirProvider);
             eventEmitter = new EventEmitter();
-            provider = new GoTreeDataProvider(eventEmitter, uriConv, treeItemProvider);
+            provider = new GoTreeDataProvider(eventEmitter, treeItemProvider);
         }
     });
 
