@@ -4,8 +4,8 @@
 			"path": "go_stub"
 		},
 		{
-			"name": "go_outside_replaced_package",
-			"path": "../go_outside_replaced_package"
+			"name": "goWorkspace",
+			"path": "."
 		}
 	],
 	"settings": {}

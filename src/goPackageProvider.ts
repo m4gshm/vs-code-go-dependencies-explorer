@@ -54,8 +54,8 @@ async function getGoPackages(goExec: GoExec): Promise<[GoStdLibTree, GoModuleTre
 
     const getGoModuleDirs = async () => {
         const extPackagesDir = getModulesPath(goExec.getEnv());
-        
-        const rootDirs = (await workspace.findFiles(GO_MOD_PATTERN)).map(f => parse(f.fsPath).dir).map(dir => normalizeWinPath(dir));
+
+        const rootDirs = (await workspace.findFiles(GO_MOD_PATTERN, extPackagesDir)).map(f => parse(f.fsPath).dir).map(dir => normalizeWinPath(dir));
         console.debug(`retrieving Go module directories ${rootDirs}`);
 
         const workDirModules = Array.from(new Set(rootDirs.map(rootDir => {

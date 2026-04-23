@@ -93,6 +93,7 @@ export async function createTreeView(ctx: ExtensionContext, treeProvider: GoTree
   async function refresh() {
     await treeProvider.refresh();
     onDidChangeTreeData.fire(undefined);
+    syncSelectedFileWithActiveTab();
   }
 
   const handleFileEvent = async (op: string, filePattern: GlobPattern, event: Uri) => {
