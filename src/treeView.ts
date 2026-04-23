@@ -116,9 +116,7 @@ export async function createTreeView(ctx: ExtensionContext, treeProvider: GoTree
 
   await treeProvider.refresh();
 
-  subscriptions.push(commands.registerCommand('go.dependencies.refresh', async () => await refresh()));
-
-  commands.executeCommand('setContext', 'go.dependencies.explorer.show', true);
+  return { treeView, refresh };
 }
 
 export function getFsUriOfSelectedItem(item: any) {

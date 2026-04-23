@@ -12,12 +12,13 @@ import { GoDirItem, GoTreeItemProvider } from './goTreeItemProvider';
 let activated: boolean;
 
 export async function activate(context: vscode.ExtensionContext): Promise<any> {
+    const subscriptions = context.subscriptions;
     const goExtensionApi = await getGoExtensionAPI();
     if (goExtensionApi) {
         return await activateWithGo(context, goExtensionApi);
     } else {
         console.log('Waiting for Go extension to activate');
-        return context.subscriptions.push(vscode.extensions.onDidChange(async e => {
+        return subscriptions.push(vscode.extensions.onDidChange(async e => {
             if (!activated) {
                 const goExtensionApi = await getGoExtensionAPI();
                 if (goExtensionApi) {
@@ -69,56 +70,55 @@ async function activateWithGo(context: vscode.ExtensionContext, goExtensionApi: 
 
     const treeProvider = await GoTreeItemProvider.new(goPackDirProvider);
 
-    await createTreeView(context, treeProvider);
+    const { refresh } = await createTreeView(context, treeProvider);
 
-    context.subscriptions.push(commands.registerCommand('go.dependencies.search.in.all.directories', async _ => {
-        const rootDirs = treeProvider.rootDirs;
-        const dirs = rootDirs.map(dir => getFsUriOfSelectedItem(dir))
-            .filter(d => d !== undefined).map(uri => uri.fsPath)
-            .reduce((l, r) => l + "," + r);
+    const subscriptions = context.subscriptions;
 
-        await commands.executeCommand("workbench.action.findInFiles", {
-            filesToInclude: dirs,
-            triggerSearch: false,
-        } as IFindInFilesArgs);
-    }));
+    subscriptions.push(
+        commands.registerCommand('go.dependencies.refresh', async () => await refresh()),
+        commands.registerCommand('go.dependencies.search.in.all.directories', async _ => {
+            const rootDirs = treeProvider.rootDirs;
+            const dirs = rootDirs.map(dir => getFsUriOfSelectedItem(dir))
+                .filter(d => d !== undefined).map(uri => uri.fsPath)
+                .reduce((l, r) => l + "," + r);
 
-    context.subscriptions.push(commands.registerCommand('go.dependencies.search.in.directory', async item => {
-        const uri = getFsUriOfSelectedItem(item);
-        if (uri) {
             await commands.executeCommand("workbench.action.findInFiles", {
-                filesToInclude: uri.fsPath,
+                filesToInclude: dirs,
                 triggerSearch: false,
             } as IFindInFilesArgs);
-        }
-    }));
-
-    context.subscriptions.push(commands.registerCommand('go.dependencies.open.in.workspace', async item => {
-        if (item instanceof GoDirItem) {
-            const path = item.id;
-            const uri = path ? Uri.file(path) : undefined;
+        }), commands.registerCommand('go.dependencies.search.in.directory', async item => {
+            const uri = getFsUriOfSelectedItem(item);
             if (uri) {
-                const workspaceFolders = workspace.workspaceFolders;
-                workspace.updateWorkspaceFolders(workspaceFolders ? workspaceFolders.length : 0, null, { uri: uri, });
+                await commands.executeCommand("workbench.action.findInFiles", {
+                    filesToInclude: uri.fsPath,
+                    triggerSearch: false,
+                } as IFindInFilesArgs);
             }
-        }
-    }));
-
-    context.subscriptions.push(commands.registerCommand('go.dependencies.copy.path', async item => {
-        await execCommandOnItem('copyFilePath', item);
-    }));
-
-    context.subscriptions.push(commands.registerCommand('go.dependencies.open.in.integrated.terminal', async item => {
-        await execCommandOnItem('openInIntegratedTerminal', item);
-    }));
+        }), commands.registerCommand('go.dependencies.open.in.workspace', async item => {
+            if (item instanceof GoDirItem) {
+                const path = item.id;
+                const uri = path ? Uri.file(path) : undefined;
+                if (uri) {
+                    const workspaceFolders = workspace.workspaceFolders;
+                    workspace.updateWorkspaceFolders(workspaceFolders ? workspaceFolders.length : 0, null, { uri: uri, });
+                }
+            }
+        }), commands.registerCommand('go.dependencies.copy.path', async item => {
+            await execCommandOnItem('copyFilePath', item);
+        }), commands.registerCommand('go.dependencies.open.in.integrated.terminal', async item => {
+            await execCommandOnItem('openInIntegratedTerminal', item);
+        }),
+    );
 
     ['mac', 'windows', 'linux'].forEach(os => {
-        context.subscriptions.push(commands.registerCommand(`go.dependencies.reveal.in.os.${os}`, async item => {
+        subscriptions.push(commands.registerCommand(`go.dependencies.reveal.in.os.${os}`, async item => {
             await execCommandOnItem('revealFileInOS', item);
         }));
     });
 
     console.log('Go Dependencies Explorer activated');
+    commands.executeCommand('setContext', 'go.dependencies.explorer.show', true);
+
     activated = true;
 }
 

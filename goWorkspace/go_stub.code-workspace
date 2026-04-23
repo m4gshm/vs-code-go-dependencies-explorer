@@ -2,6 +2,10 @@
 	"folders": [
 		{
 			"path": "go_stub"
+		},
+		{
+			"name": "go_outside_replaced_package",
+			"path": "../go_outside_replaced_package"
 		}
 	],
 	"settings": {}
