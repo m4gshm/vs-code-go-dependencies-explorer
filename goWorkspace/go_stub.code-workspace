@@ -2,10 +2,6 @@
 	"folders": [
 		{
 			"path": "go_stub"
-		},
-		{
-			"name": "goWorkspace",
-			"path": "."
 		}
 	],
 	"settings": {}

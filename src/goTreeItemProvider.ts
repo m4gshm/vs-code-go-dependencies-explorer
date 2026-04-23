@@ -1,7 +1,7 @@
 import { TreeItem, TreeItemCollapsibleState, Uri } from "vscode";
 import { PathElement, flat } from "./pathTree";
 import { GoPackageProvider } from "./goPackageProvider";
-import { join } from 'path';
+import { parse, join } from 'path';
 
 export class GoTreeItemProvider {
     private _stdLibRootDir!: GoDirItem;
@@ -43,7 +43,9 @@ export class GoTreeItemProvider {
         }
 
         const rootReplaced = modules.rootReplaced;
-        this._replacedRootDir = rootReplaced ? newGoDirItem(rootReplaced) : undefined;
+        const rootReplacedName = rootReplaced?.name;
+        const rootReplacedLabel = rootReplacedName ? "..." + parse(rootReplacedName).name : undefined;
+        this._replacedRootDir = rootReplaced ? newGoDirItem(rootReplaced, rootReplacedLabel) : undefined;
         const flatReplaced = rootReplaced ? flat([rootReplaced]) : new Map<string, PathElement>();
         this._replacedDirs = convertToGoDirs(flatReplaced);
     }
