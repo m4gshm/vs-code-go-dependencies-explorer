@@ -1,43 +1,27 @@
 import * as assert from 'assert';
-import { EventEmitter, workspace } from 'vscode';
 import { getGoBinPath, getGoExtensionAPI, GoExtensionAPI } from '../goExtension';
 import { GoExec } from '../goExec';
 import { GoPackageProvider } from '../goPackageProvider';
-import { GoTreeItemProvider } from '../goTreeItemProvider';
+import { GoDependenciesStateProvider } from '../goDependenciesStateProvider';
 import { GoTreeDataProvider } from '../treeView';
 
 suite('GoTreeDataProvider Test Suite', () => {
-    let goExtensionApi: GoExtensionAPI | undefined;
-    let goExec: GoExec | undefined;
-    let goPackDirProvider: GoPackageProvider | undefined;
-    let treeItemProvider: GoTreeItemProvider | undefined;
-    let eventEmitter: EventEmitter<any> | undefined;
     let provider: GoTreeDataProvider | undefined;
 
     suiteSetup(async () => {
-        goExtensionApi = await getGoExtensionAPI();
+        const goExtensionApi = await getGoExtensionAPI();
         if (!goExtensionApi) {
             throw new Error('GoExtensionAPI not found');
         } else {
-            goExec = new GoExec(getGoBinPath(goExtensionApi));
-            goPackDirProvider = new GoPackageProvider(goExec);
-            treeItemProvider = await GoTreeItemProvider.new(goPackDirProvider);
-            eventEmitter = new EventEmitter();
-            provider = new GoTreeDataProvider(eventEmitter, treeItemProvider);
+            const goExec = new GoExec(getGoBinPath(goExtensionApi));
+            const goPackDirProvider = new GoPackageProvider(goExec);
+            const goDependenciesStateProvider = await GoDependenciesStateProvider.new(goPackDirProvider);
+            provider = new GoTreeDataProvider(goDependenciesStateProvider);
         }
     });
 
-    test('getTreeItem returns same element', async () => {
-        await treeItemProvider!.refresh();
-        const rootDirs = treeItemProvider!.rootDirs;
-        assert.ok(rootDirs.length > 0);
-        const element = rootDirs[0];
-        const treeItem = provider!.getTreeItem(element);
-        assert.strictEqual(treeItem, element);
-    });
-
     test('getChildren with undefined element returns root directories', async () => {
-        await treeItemProvider!.refresh();
+        await provider!.refresh();
         const children = await provider!.getChildren();
         assert.ok(children);
         assert.ok(Array.isArray(children));
@@ -47,17 +31,17 @@ suite('GoTreeDataProvider Test Suite', () => {
     });
 
     test('getChildren with GoDirItem returns subdirectories and files', async () => {
-        await treeItemProvider!.refresh();
-        const rootDirs = treeItemProvider!.rootDirs;
+        await provider!.refresh();
+        const rootDirs = await provider!.getChildren();
         const rootDir = rootDirs[0];
         const children = await provider!.getChildren(rootDir);
         assert.ok(Array.isArray(children));
     });
 
     test('getParent returns parent directory for known path', async () => {
-        await treeItemProvider!.refresh();
+        await provider!.refresh();
         // Find a directory that has a parent (e.g., a subdirectory of stdlib)
-        const rootDirs = treeItemProvider!.rootDirs;
+        const rootDirs = await provider!.getChildren();
         const rootDir = rootDirs[0];
         const children = await provider!.getChildren(rootDir);
         if (children.length > 0) {
@@ -70,8 +54,8 @@ suite('GoTreeDataProvider Test Suite', () => {
     });
 
     test('getParent returns undefined for root directory', async () => {
-        await treeItemProvider!.refresh();
-        const rootDirs = treeItemProvider!.rootDirs;
+        await provider!.refresh();
+        const rootDirs = await provider!.getChildren();
         const rootDir = rootDirs[0];
         const parent = await provider!.getParent(rootDir);
         assert.strictEqual(parent, undefined);

@@ -7,6 +7,10 @@ export class PathElement {
         public readonly children: PathElement[],
         public readonly exposeFiles: boolean = false,
     ) { }
+
+    with(opts: { name: string }) {
+        return { ...this, name: opts.name };
+    }
 }
 
 export function flat(dirs: PathElement[]) {

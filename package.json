@@ -6,12 +6,15 @@
   "description": "File explorer for quickly accessing Go package resources such as .go files and so on.",
   "version": "0.0.5",
   "engines": {
-    "vscode": "^1.115.0"
+    "vscode": "^1.112.0"
   },
   "categories": [
     "Programming Languages"
   ],
   "activationEvents": [
+    "workspaceContains:**/*.go",
+    "workspaceContains:go.mod",
+    "workspaceContains:go.sum",
     "onLanguage:go",
     "onLanguage:go.sum",
     "onLanguage:gotmpl",

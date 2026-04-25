@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { createTreeView, getFsUriOfSelectedItem } from "./treeView";
+import { createTreeView, getFsUriOfSelectedItem, GoDirItem } from "./treeView";
 import { GoExec } from './goExec';
 import { getGoBinPath, getGoExtensionAPI, GoExtensionAPI } from './goExtension';
 import { GitExtension } from './gitExtension';
@@ -7,7 +7,7 @@ import { GoPackageProvider } from './goPackageProvider';
 import { getGoPackagePaths } from './goDirs';
 import { commands, Uri, workspace } from 'vscode';
 import { IFindInFilesArgs } from './search';
-import { GoDirItem, GoTreeItemProvider } from './goTreeItemProvider';
+import { GoDependenciesStateProvider } from './goDependenciesStateProvider';
 
 let activated: boolean;
 
@@ -68,14 +68,14 @@ async function activateWithGo(context: vscode.ExtensionContext, goExtensionApi: 
 
     const goPackDirProvider = new GoPackageProvider(goExec);
 
-    const treeProvider = await GoTreeItemProvider.new(goPackDirProvider);
+    const treeProvider = await GoDependenciesStateProvider.new(goPackDirProvider);
 
     const { refresh } = await createTreeView(context, treeProvider);
 
     const subscriptions = context.subscriptions;
 
     subscriptions.push(
-        commands.registerCommand('go.dependencies.refresh', async () => await refresh()),
+        commands.registerCommand('go.dependencies.refresh', async () => await refresh(true)),
         commands.registerCommand('go.dependencies.search.in.all.directories', async _ => {
             const rootDirs = treeProvider.rootDirs;
             const dirs = rootDirs.map(dir => getFsUriOfSelectedItem(dir))
