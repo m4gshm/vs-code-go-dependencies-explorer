@@ -1,24 +1,30 @@
 {
   "name": "vs-code-go-dependencies-explorer",
+  "icon": "icon.png",
+  "type": "commonjs",
   "publisher": "m4gshm",
   "displayName": "Go dependencies explorer",
   "description": "File explorer for quickly accessing Go package resources such as .go files and so on.",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "engines": {
-    "vscode": "^1.96.0"
+    "vscode": "^1.112.0"
   },
   "categories": [
     "Programming Languages"
   ],
   "activationEvents": [
-    "onLanguage:go",
-    "onLanguage:go.sum",
-    "onLanguage:gotmpl"
+    "workspaceContains:**/*.go",
+    "workspaceContains:go.mod",
+    "workspaceContains:go.sum"
+  ],
+  "extensionDependencies": [
+    "golang.go",
+    "vscode.git"
   ],
   "main": "./dist/extension.js",
   "contributes": {
     "configuration": {
-      "title": "GoDependenciesExplorer",
+      "title": "Go Dependencies Explorer",
       "properties": {
         "go.dependencies.explorer.prevent.open.git.repo": {
           "type": "string",
@@ -36,8 +42,9 @@
       "explorer": [
         {
           "id": "go.dependencies.explorer",
-          "name": "Dependencies",
-          "when": "go.dependencies.explorer.show"
+          "name": "GO Dependencies",
+          "when": "go.dependencies.explorer.show",
+          "icon": "Go"
         }
       ]
     },
@@ -48,6 +55,13 @@
         "description": "Refresh the Go Dependencies.",
         "category": "Explorer",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "go.dependencies.search.in.all.directories",
+        "title": "Search in dependencies",
+        "description": "Search in dependencies.",
+        "category": "Explorer",
+        "icon": "$(search)"
       },
       {
         "command": "go.dependencies.copy.path",
@@ -68,12 +82,25 @@
       {
         "command": "go.dependencies.reveal.in.os.linux",
         "title": "Reveal in Explorer View"
+      },
+      {
+        "command": "go.dependencies.search.in.directory",
+        "title": "Search in directory"
+      },
+      {
+        "command": "go.dependencies.open.in.workspace",
+        "title": "Open in Workspace"
       }
     ],
     "menus": {
       "view/title": [
         {
           "command": "go.dependencies.refresh",
+          "when": "view == go.dependencies.explorer",
+          "group": "navigation"
+        },
+        {
+          "command": "go.dependencies.search.in.all.directories",
           "when": "view == go.dependencies.explorer",
           "group": "navigation"
         }
@@ -84,7 +111,15 @@
           "command": "go.dependencies.copy.path"
         },
         {
-          "when": "view == 'go.dependencies.explorer'",
+          "when": "view == 'go.dependencies.explorer' && viewItem == goDir",
+          "command": "go.dependencies.search.in.directory"
+        },
+        {
+          "when": "view == 'go.dependencies.explorer' && viewItem == goDir",
+          "command": "go.dependencies.open.in.workspace"
+        },
+        {
+          "when": "view == 'go.dependencies.explorer' && viewItem == goDir",
           "command": "go.dependencies.open.in.integrated.terminal"
         },
         {
@@ -106,35 +141,42 @@
     "rimraf": "./node_modules/rimraf/bin.js",
     "clean": "rimraf ./dist ./out",
     "check-types": "tsc --noEmit",
+    "prepackage": "npm run build",
     "package": "npx vsce ls && npx vsce package",
-    "vscode:prepublish": "npm run clean && npm run bundle",
+    "vscode:prepublish": "npm run clean && npm run build",
     "compile": "tsc -p ./",
-    "bundle": "node esbuild.js",
     "watch": "tsc -watch -p ./",
+    "predist": "npm run compile",
+    "dist": "node esbuild.js",
+    "dist-watch": "node esbuild.js --watch",
     "lint": "eslint src",
-    "test": "node --test test/**/*.test.ts",
-    "build":"compile test lint"
+    "test": "node --import tsx --test src/test/**/*.test.ts",
+    "prevscode-test": "npm run dist",
+    "vscode-test": "vscode-test",
+    "build": "npm run clean && npm run vscode-test && npm run test && npm run lint"
   },
   "devDependencies": {
-    "@types/node": "20.x",
-    "@types/semver": "^7.5.8",
-    "@types/vscode": "^1.96.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^20.19.39",
+    "@types/semver": "^7.7.1",
+    "@types/sinon": "^21.0.1",
+    "@types/vscode": "^1.112.0",
     "@types/wu": "^2.1.44",
-    "@typescript-eslint/eslint-plugin": "^8.17.0",
-    "@typescript-eslint/parser": "^8.17.0",
-    "@vscode/vsce": "^3.2.2",
-    "esbuild": ">=0.25.0",
-    "eslint": "^9.16.0",
-    "mocha": "^11.1.0",
-    "rimraf": "^6.0.1",
-    "typescript": "^5.7.2"
+    "@typescript-eslint/eslint-plugin": "^8.58.0",
+    "@typescript-eslint/parser": "^8.58.0",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^3.9.1",
+    "esbuild": ">=0.28.0",
+    "eslint": "^10.2.0",
+    "mocha": "^11.6.0",
+    "rimraf": "^6.1.3",
+    "sinon": "^21.1.2",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2"
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/m4gshm/vs-code-go-dependencies-explorer.git"
-  },
-  "dependencies": {
-    "npx": "^10.2.2",
-    "vsce": "^2.15.0"
   }
 }

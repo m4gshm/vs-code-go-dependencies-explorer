@@ -4,12 +4,32 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
+			"label": "dist-watch",
 			"type": "npm",
-			"script": "watch",
-			"problemMatcher": "$tsc-watch",
+			"script": "dist-watch",
+			// "problemMatcher": "$tsc-watch",
+			"problemMatcher": {
+				"owner": "esbuild",
+				"background": {
+					"activeOnStart": true,
+					"beginsPattern": {
+						"regexp": "(build started|watching for changes)"
+					},
+					"endsPattern": {
+						"regexp": "(build finished|clean|updated)"
+					}
+				},
+				"pattern": {
+					"regexp": "^(?:\\x1b\\[\\d+m)?(\\.\\.?\\/.*?):(\\d+):(\\d+):\\s+(?:(?:error|warning):\\s+)?(.*)(?:\\x1b\\[\\d+m)?$",
+					"file": 1,
+					"line": 2,
+					"column": 3,
+					"message": 4
+				}
+			},
 			"isBackground": true,
 			"presentation": {
-				"reveal": "never"
+				"reveal": "silent"
 			},
 			"group": {
 				"kind": "build",
