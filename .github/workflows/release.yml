@@ -16,11 +16,12 @@ jobs:
         uses: actions/setup-node@v1
         with:
           node-version: ${{ matrix.node-version }}
-      - name: package
-        run: |
-          npm install
-          npm test
-          npm run package       
+      - name: tests and package
+        uses: coactions/setup-xvfb@v1
+        with:
+          run: |
+            npm install
+            npm run package
       - name: upload the artifacts
         uses: skx/github-action-publish-binaries@master
         env:

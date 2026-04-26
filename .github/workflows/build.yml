@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [23.9.x]
+        node-version: [ 23.9.x ]
     steps:
       - name: checkout
         uses: actions/checkout@v3
@@ -15,9 +15,9 @@ jobs:
         uses: actions/setup-node@v1
         with:
           node-version: ${{ matrix.node-version }}
-      - name: build
-        run: |
-          npm install
-          npm run compile
-          npm run test
-
+      - name: tests and package
+        uses: coactions/setup-xvfb@v1
+        with:
+          run: |
+            npm install
+            npm run package
