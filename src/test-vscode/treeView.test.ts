@@ -33,7 +33,7 @@ suite('TreeView Integration Test Suite', () => {
         const provider = new GoTreeDataProvider(goDependenciesStateProvider);
         assert.ok(provider);
         assert.ok(provider.onDidChangeTreeData);
-        
+
         // Should not throw on dispose
         provider.dispose();
     });
@@ -50,10 +50,10 @@ suite('TreeView Integration Test Suite', () => {
         });
 
         await provider.refresh();
-        
+
         // Refresh should trigger onDidChangeTreeData
         assert.strictEqual(changeFired, true);
-        
+
         disposable.dispose();
         provider.dispose();
     });
@@ -65,17 +65,17 @@ suite('TreeView Integration Test Suite', () => {
 
         const provider = new GoTreeDataProvider(goDependenciesStateProvider);
         await provider.refresh();
-        
+
         const children = await provider.getChildren();
         assert.ok(children);
         assert.ok(Array.isArray(children));
         assert.ok(children.length >= 2); // Should have at least Standard library and External packages
-        
+
         // Check that root items are GoDirItem instances
         for (const child of children) {
             assert.ok(child instanceof GoDirItem);
         }
-        
+
         provider.dispose();
     });
 
@@ -86,7 +86,7 @@ suite('TreeView Integration Test Suite', () => {
 
         const provider = new GoTreeDataProvider(goDependenciesStateProvider);
         await provider.refresh();
-        
+
         const rootDirs = await provider.getChildren();
         if (rootDirs.length > 0) {
             const rootDir = rootDirs[0];
@@ -94,7 +94,7 @@ suite('TreeView Integration Test Suite', () => {
             assert.ok(Array.isArray(children));
             // Children could be empty or contain GoDirItem/GoFileItem instances
         }
-        
+
         provider.dispose();
     });
 
@@ -105,7 +105,7 @@ suite('TreeView Integration Test Suite', () => {
 
         const provider = new GoTreeDataProvider(goDependenciesStateProvider);
         await provider.refresh();
-        
+
         const rootDirs = await provider.getChildren();
         if (rootDirs.length > 0) {
             const rootDir = rootDirs[0];
@@ -117,7 +117,7 @@ suite('TreeView Integration Test Suite', () => {
                 assert.strictEqual(parent?.id, rootDir.id);
             }
         }
-        
+
         provider.dispose();
     });
 
@@ -128,14 +128,14 @@ suite('TreeView Integration Test Suite', () => {
 
         const provider = new GoTreeDataProvider(goDependenciesStateProvider);
         await provider.refresh();
-        
+
         const rootDirs = await provider.getChildren();
         if (rootDirs.length > 0) {
             const rootDir = rootDirs[0];
             const parent = await provider.getParent(rootDir);
             assert.strictEqual(parent, undefined);
         }
-        
+
         provider.dispose();
     });
 
@@ -211,16 +211,16 @@ suite('TreeView Integration Test Suite', () => {
 
         const provider = new GoTreeDataProvider(goDependenciesStateProvider);
         await provider.refresh();
-        
+
         const children = await provider.getChildren();
         if (children.length > 0) {
             const rootDir = children[0];
-            
+
             // Should handle without errors
             provider.onExpand(rootDir);
             provider.onCollapse(rootDir);
         }
-        
+
         provider.dispose();
     });
 });

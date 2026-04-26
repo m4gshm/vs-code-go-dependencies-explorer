@@ -9,7 +9,7 @@ export class PathElement {
     ) { }
 
     with(opts: { name: string }) {
-        return { ...this, name: opts.name };
+        return { ...this, name: opts.name } as PathElement;
     }
 }
 

@@ -128,7 +128,7 @@ export async function createTreeView(ctx: ExtensionContext, treeProvider: GoDepe
   subscriptions.push(workspaceListener);
 
   await refresh();
-  // syncSelectedFileWithActiveTab();
+  syncSelectedFileWithActiveTab();
 
   return { treeView, refresh };
 }
@@ -181,6 +181,7 @@ export class GoTreeDataProvider implements TreeDataProvider<TreeItem>, Disposabl
       this.elements.clear();
       this.children.clear();
       this.parents.clear();
+      this.expanded.clear();
     } else {
       const changes = await this.treeProvider.refresh(true);
       if (changes) {
@@ -207,6 +208,7 @@ export class GoTreeDataProvider implements TreeDataProvider<TreeItem>, Disposabl
       this.elements.delete(id);
       this.children.delete(id);
       this.parents.delete(id);
+      this.expanded.delete(id);
     }
   }
 
