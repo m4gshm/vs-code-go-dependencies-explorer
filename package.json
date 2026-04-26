@@ -1,5 +1,6 @@
 {
   "name": "vs-code-go-dependencies-explorer",
+  "icon": "icon.png",
   "type": "commonjs",
   "publisher": "m4gshm",
   "displayName": "Go dependencies explorer",
