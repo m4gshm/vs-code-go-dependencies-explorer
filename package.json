@@ -85,7 +85,7 @@
       },
       {
         "command": "go.dependencies.search.in.directory",
-        "title": "Search in directory"
+        "title": "Search in Directory"
       },
       {
         "command": "go.dependencies.open.in.workspace",
