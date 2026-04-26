@@ -5,9 +5,6 @@
 	xml:space="preserve">
 	<defs>
 		<style type="text/css">
-			svg {
-				background-color: #DDDDDD;
-			}
 			#gopher {
 
 				transform-origin: right bottom;
@@ -18,6 +15,8 @@
 			}
 		</style>
 	</defs>
+
+	 <rect x="0" y="0" width="100%" height="100%" rx="50" ry="50" fill="#DDDDDD"/>
 
 	<!-- https://github.com/golang-samples/gopher-vector/blob/master/gopher.svg -->
 	<g id="gopher" transform="scale(0.8) translate(130,300)">

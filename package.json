@@ -15,13 +15,7 @@
   "activationEvents": [
     "workspaceContains:**/*.go",
     "workspaceContains:go.mod",
-    "workspaceContains:go.sum",
-    "onLanguage:go",
-    "onLanguage:go.sum",
-    "onLanguage:gotmpl",
-    "onLanguage:go.asm",
-    "onDebugResolve:go",
-    "onWebviewPanel:welcomeGo"
+    "workspaceContains:go.sum"
   ],
   "extensionDependencies": [
     "golang.go",
