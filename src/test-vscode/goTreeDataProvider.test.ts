@@ -26,8 +26,8 @@ suite('GoTreeDataProvider Test Suite', () => {
         assert.ok(children);
         assert.ok(Array.isArray(children));
         assert.ok(children.length === 3);
-        assert.strictEqual('Standard library', children[0].label);
-        assert.strictEqual('External packages', children[1].label);
+        assert.strictEqual('Standard Library', children[0].label);
+        assert.strictEqual('External Packages', children[1].label);
     });
 
     test('getChildren with GoDirItem returns subdirectories and files', async () => {

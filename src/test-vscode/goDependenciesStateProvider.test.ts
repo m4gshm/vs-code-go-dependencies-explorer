@@ -28,8 +28,8 @@ suite(typeof GoDependenciesStateProvider + ' Test Suite', () => {
 
         assert.ok(rootDirs.length === 3);
 
-        assert.equal('Standard library', rootDirs[0].name);
-        assert.equal('External packages', rootDirs[1].name);
+        assert.equal('Standard Library', rootDirs[0].name);
+        assert.equal('External Packages', rootDirs[1].name);
     });
 
     test('findDir returns directory for known path', async () => {

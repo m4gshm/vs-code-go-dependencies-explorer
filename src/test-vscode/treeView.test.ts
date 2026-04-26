@@ -69,7 +69,7 @@ suite('TreeView Integration Test Suite', () => {
         const children = await provider.getChildren();
         assert.ok(children);
         assert.ok(Array.isArray(children));
-        assert.ok(children.length >= 2); // Should have at least Standard library and External packages
+        assert.ok(children.length >= 2); // Should have at least Standard Library and External Packages
 
         // Check that root items are GoDirItem instances
         for (const child of children) {
