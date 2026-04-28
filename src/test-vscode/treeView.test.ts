@@ -154,7 +154,7 @@ suite('TreeView Integration Test Suite', () => {
         assert.strictEqual(dirItem.label, 'testDir');
         assert.strictEqual(dirItem.collapsibleState, TreeItemCollapsibleState.Collapsed);
         assert.strictEqual(dirItem.contextValue, 'goDir');
-        assert.strictEqual(dirItem.tooltip, 'testDir');
+        assert.strictEqual(dirItem.tooltip, testPath);
         assert.strictEqual(dirItem.dir, mockPathElement);
 
         const fileItem = new GoFileItem('test.go', testPath);
@@ -162,7 +162,7 @@ suite('TreeView Integration Test Suite', () => {
         assert.strictEqual(fileItem.id, expectedFilePath);
         assert.strictEqual(fileItem.label, 'test.go');
         assert.strictEqual(fileItem.contextValue, 'goFile');
-        assert.strictEqual(fileItem.tooltip, 'test.go');
+        assert.strictEqual(fileItem.tooltip, expectedFilePath);
         assert.ok(fileItem.resourceUri);
     });
 
