@@ -4,6 +4,7 @@ import { GoExec } from '../goExec';
 import { GoPackageProvider } from '../goPackageProvider';
 import { getGoBinPath, getGoExtensionAPI } from '../goExtension';
 import { GoDependenciesStateProvider } from '../goDependenciesStateProvider';
+import { PathElement } from '../pathTree';
 
 suite(typeof GoDependenciesStateProvider + ' Test Suite', () => {
 
@@ -27,6 +28,9 @@ suite(typeof GoDependenciesStateProvider + ' Test Suite', () => {
         assert.ok(Array.isArray(rootDirs));
 
         assert.ok(rootDirs.length === 3);
+        for (const dir of rootDirs) {
+            assert.ok(dir instanceof PathElement);
+        }
 
         assert.equal('Standard Library', rootDirs[0].name);
         assert.equal('External Packages', rootDirs[1].name);

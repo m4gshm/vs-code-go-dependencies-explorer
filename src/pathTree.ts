@@ -8,8 +8,8 @@ export class PathElement {
         public readonly exposeFiles: boolean = false,
     ) { }
 
-    with(opts: { name: string }) {
-        return { ...this, name: opts.name } as PathElement;
+    with(opts: { name: string }): PathElement {
+        return Object.assign(Object.create(Object.getPrototypeOf(this)), this, { name: opts.name });
     }
 }
 

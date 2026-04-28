@@ -386,7 +386,7 @@ export class GoDirItem extends TreeItem {
     super(label || dir.name, TreeItemCollapsibleState.Collapsed);
     this.id = dir.path;
     this.collapsibleState = TreeItemCollapsibleState.Collapsed;
-    this.tooltip = dir.name;
+    this.tooltip = dir.path;
     this.contextValue = 'goDir';
   }
 }
@@ -401,7 +401,7 @@ export class GoFileItem extends TreeItem {
     this.id = fullFilePath;
     //just file to render mime icon but prevent file name colorizing by Git extension 
     this.resourceUri = Uri.file(fileName);
-    this.tooltip = fileName;
+    this.tooltip = fullFilePath;
     this.contextValue = 'goFile';
   }
 }

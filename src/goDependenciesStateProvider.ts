@@ -32,7 +32,7 @@ export class GoDependenciesStateProvider {
 
         const [std, modules] = await this.packageProvider.getPackages();
 
-        const newStdLibRootDir = std.root.with({ name: 'Standard Library' });//newGoDirItem(std.root, 'Standard Library');
+        const newStdLibRootDir = std.root.with({ name: 'Standard Library' });;
 
         this._stdLibRootDir = newStdLibRootDir;
         const oldStdLibDirs = this._stdLibDirs;

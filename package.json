@@ -5,7 +5,7 @@
   "publisher": "m4gshm",
   "displayName": "Go dependencies explorer",
   "description": "File explorer for quickly accessing Go package resources such as .go files and so on.",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "engines": {
     "vscode": "^1.112.0"
   },
@@ -58,8 +58,8 @@
       },
       {
         "command": "go.dependencies.search.in.all.directories",
-        "title": "Search in dependencies",
-        "description": "Search in dependencies.",
+        "title": "Search in Dependencies",
+        "description": "Search in all dependency directories",
         "category": "Explorer",
         "icon": "$(search)"
       },
