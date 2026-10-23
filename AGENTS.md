@@ -63,8 +63,16 @@ Key invariants:
 
 ## Conventions
 
-- **Comments**: only for non-obvious rationale, invariants and gotchas; do not
-  restate what the code says. Remove nearby comments that became redundant.
+- **Comments**: default to **no comments**. Write code that explains itself;
+  add a comment only when the code cannot convey non-obvious *why* — invariants,
+  workarounds, platform quirks, external-command behavior. Never comment:
+  - what the next line obviously does ("//log", "// Trigger event", "// Create X");
+  - JSDoc restating parameter names/types on trivial functions;
+  - section markers, TODO-free narration, alternatives that were not chosen.
+  If a block needs an explaining comment, first try renaming or extracting a
+  well-named helper instead. When editing code, delete nearby comments that
+  became redundant. Tests follow the same rule: assertion names and structure
+  should make the intent clear without commentary.
 - TypeScript strict mode, CommonJS sources bundled by esbuild; no build step
   for unit tests (`tsx` runs them directly).
 - Prefer keeping pure logic (trees, diffs, parsing) in `vscode`-free modules

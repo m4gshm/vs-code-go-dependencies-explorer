@@ -11,6 +11,7 @@ import { IFindInFilesArgs } from './search';
 import { GoDependenciesStateProvider } from './goDependenciesStateProvider';
 
 let activated: boolean;
+let activating: Promise<any> | undefined;
 
 export async function activate(context: ExtensionContext): Promise<any> {
     const subscriptions = context.subscriptions;
@@ -20,10 +21,12 @@ export async function activate(context: ExtensionContext): Promise<any> {
     } else {
         console.log('Waiting for Go extension to activate');
         return subscriptions.push(extensions.onDidChange(async e => {
-            if (!activated) {
+            if (!activated && !activating) {
                 const goExtensionApi = await getGoExtensionAPI();
-                if (goExtensionApi) {
-                    await activateWithGo(context, goExtensionApi);
+                if (goExtensionApi && !activated) {
+                    activating = activateWithGo(context, goExtensionApi)
+                        .finally(() => { activating = undefined; });
+                    await activating;
                 }
             }
         }));
@@ -48,7 +51,7 @@ async function activateWithGo(context: ExtensionContext, goExtensionApi: GoExten
                     const rootUri = repository.rootUri;
                     const rootPath = rootUri.fsPath;
 
-                    const { stdLibPath: stdLibPath, modulePath: modulesPath } = getGoPackagePaths(goExec);
+                    const { stdLibPath: stdLibPath, modulePath: modulesPath } = await getGoPackagePaths(goExec);
                     [stdLibPath, modulesPath].forEach(async dir => {
                         if (rootPath.startsWith(dir) || dir.startsWith(rootPath)) {
                             let close = true;

@@ -34,48 +34,43 @@ suite('GoExec Test Suite', () => {
     assert.strictEqual(expected, extPackagesDir);
   });
 
-  test('listPackageDirs returns array', () => {
-    const dirs = goExec!.listPackageDirs();
+  test('listPackageDirs returns array', async () => {
+    const dirs = await goExec!.listPackageDirs();
     assert.ok(Array.isArray(dirs));
-    // May be empty if no packages matched (e.g., no Go module in current directory)
-    // Accept any length >= 0
     assert.ok(dirs.length >= 0);
   });
 
-  test('listPackageDirs with workDir and excludeWorkDir false', () => {
-    const dirs = goExec!.listPackageDirs(workDir, false);
+  test('listPackageDirs with workDir and excludeWorkDir false', async () => {
+    const dirs = await goExec!.listPackageDirs(workDir, false);
     assert.ok(Array.isArray(dirs));
-    // Should include the workDir itself (since excludeWorkDir = false)
     const normalizedWorkDir = normalizeWinPath(workDir);
     assert.ok(dirs.some(dir => normalizeWinPath(dir) === normalizedWorkDir));
   });
 
-  test('listAllPackageDirs with multiple workDirs', () => {
-    const dirs = goExec!.listAllPackageDirs([workDir, workDir2]);
+  test('listAllPackageDirs with multiple workDirs', async () => {
+    const dirs = await goExec!.listAllPackageDirs([workDir, workDir2]);
     assert.ok(Array.isArray(dirs));
-    // Should contain directories from both workDirs (or at least from one)
     assert.ok(dirs.length >= 0);
   });
 
-  test('getModules returns modules', () => {
-    const modules = goExec!.getModules(undefined, workDir);
+  test('getModules returns modules', async () => {
+    const modules = await goExec!.getModules(undefined, workDir);
     assert.ok(Array.isArray(modules));
-    // At least the stub module should be present
     const stubModule = modules.find(m => m.path === 'stub');
     assert.ok(stubModule, 'stub module not found');
     assert.ok(stubModule!.dir.length > 0);
     assert.ok(typeof stubModule!.replaced === 'boolean');
   });
 
-  test('getModules with specific module name', () => {
-    const modules = goExec!.getModules('stub', workDir);
+  test('getModules with specific module name', async () => {
+    const modules = await goExec!.getModules('stub', workDir);
     assert.ok(Array.isArray(modules));
     assert.strictEqual(modules.length, 1);
     assert.strictEqual(modules[0].path, 'stub');
   });
 
-  test('getEnv returns expected keys', () => {
-    const env = goExec!.getEnv();
+  test('getEnv returns expected keys', async () => {
+    const env = await goExec!.getEnv();
     assert.ok(env.GOROOT, 'GOROOT missing');
     assert.ok(env.GOPATH, 'GOPATH missing');
     assert.ok(env.GOMODCACHE, 'GOMODCACHE missing');

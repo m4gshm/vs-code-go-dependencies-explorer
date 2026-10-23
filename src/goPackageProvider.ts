@@ -14,8 +14,8 @@ export class GoPackageProvider implements Disposable {
     private readonly _onRequestPackages = new EventEmitter<[GoStdLibTree, GoModuleTree]>();
     readonly onRequestPackages = this._onRequestPackages.event;
 
-    getPackagePaths() {
-        return getGoPackagePaths(this.goExec);
+    async getPackagePaths() {
+        return await getGoPackagePaths(this.goExec);
     }
 
     async getPackages() {
@@ -39,28 +39,28 @@ export interface GoModuleTree {
 }
 
 async function getGoPackages(goExec: GoExec): Promise<[GoStdLibTree, GoModuleTree]> {
-    const getPackageDirs = (dir: string) => Array.from(new Set(listGoPackageDirs(dir)));
+    const getPackageDirs = async (dir: string) => Array.from(new Set(await listGoPackageDirs(dir)));
 
-    const getGoStdLibDirs = () => {
-        const env = goExec.getEnv();
+    const getGoStdLibDirs = async () => {
+        const env = await goExec.getEnv();
         const stdLibPath = getStdLibPath(env);
 
         console.debug(`retrieving Go package for standard library ${stdLibPath}`);
 
-        const stdGoPackageDirs = getPackageDirs(stdLibPath);
+        const stdGoPackageDirs = await getPackageDirs(stdLibPath);
         const root = PathTreeBuilder.create(stdGoPackageDirs, stdLibPath)!!.toDirectory();
         return { root };
     };
 
     const getGoModuleDirs = async () => {
-        const extPackagesDir = getModulesPath(goExec.getEnv());
+        const extPackagesDir = getModulesPath(await goExec.getEnv());
 
         const rootDirs = (await workspace.findFiles(GO_MOD_PATTERN, extPackagesDir)).map(f => parse(f.fsPath).dir).map(dir => normalizeWinPath(dir));
         console.debug(`retrieving Go module directories ${rootDirs}`);
 
-        const workDirModules = Array.from(new Set(rootDirs.map(rootDir => {
+        const workDirModules = (await Promise.all(rootDirs.map(async rootDir => {
             try {
-                const modules = goExec.getModules("all", rootDir);
+                const modules = await goExec.getModules("all", rootDir);
                 const noRootModules = modules.filter(module => {
                     const inRootDir = rootDirs.some(rd => {
                         return module.dir.startsWith(rd);
@@ -71,7 +71,7 @@ async function getGoPackages(goExec: GoExec): Promise<[GoStdLibTree, GoModuleTre
             } catch (err) {
                 return { baseDir: rootDir, modules: [], error: err };
             }
-        }).flatMap(d => d)));
+        })));
 
         const moduleDirsSet = new Set<string>();
         const replacedDirsSet = new Set<string>();
@@ -94,38 +94,38 @@ async function getGoPackages(goExec: GoExec): Promise<[GoStdLibTree, GoModuleTre
 
         const modulePath = Array.from(moduleDirsSet);
         console.debug(`retrieving Go package dirs for module dirs ${modulePath}`);
-        const modulePackageDirs = modulePath.map(d => getPackageDirs(d)).flatMap(dd => dd);
+        const modulePackageDirs = (await Promise.all(modulePath.map(d => getPackageDirs(d)))).flatMap(dd => dd);
 
         const replacedDirs = Array.from(replacedDirsSet);
         console.debug(`retrieving Go replaced package dirs for module dirs ${replacedDirs}`);
-        const replacedPackageDirs = replacedDirs.map(d => getPackageDirs(d)).flatMap(dd => dd);
+        const replacedPackageDirs = (await Promise.all(replacedDirs.map(d => getPackageDirs(d)))).flatMap(dd => dd);
 
         const root = PathTreeBuilder.create(modulePackageDirs, extPackagesDir)?.toDirectory();
         const rootReplaced = PathTreeBuilder.create(replacedPackageDirs)?.toDirectory();
         return { root, rootReplaced };
     };
 
-    return [getGoStdLibDirs(), await getGoModuleDirs()];
+    return [await getGoStdLibDirs(), await getGoModuleDirs()];
 }
 
 
-function listGoPackageDirs(dirPath: string): string[] {
+async function listGoPackageDirs(dirPath: string): Promise<string[]> {
     let entries: fs.Dirent[];
     try {
-        entries = fs.readdirSync(dirPath, { withFileTypes: true });
+        entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
     } catch (err) {
         console.error(`readdir error for ${dirPath}:`, err);
         return [];
     }
     let isGoPackage = false;
     let subPackages: string[] = [];
-    for (const sub of entries) {
+    await Promise.all(entries.map(async sub => {
         if (sub.isFile() && sub.name.endsWith('.go')) {
             isGoPackage = true;
         } else if (sub.isDirectory()) {
-            subPackages.push(...listGoPackageDirs(join(sub.parentPath, sub.name)));
+            subPackages.push(...(await listGoPackageDirs(join(sub.parentPath, sub.name))));
         }
-    }
+    }));
     const result = isGoPackage ? [normalizeWinPath(dirPath)] : [];
     return subPackages.length > 0 ? [...result, ...subPackages] : result;
 }

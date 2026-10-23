@@ -34,7 +34,6 @@ suite('TreeView Integration Test Suite', () => {
         assert.ok(provider);
         assert.ok(provider.onDidChangeTreeData);
 
-        // Should not throw on dispose
         provider.dispose();
     });
 
@@ -51,7 +50,6 @@ suite('TreeView Integration Test Suite', () => {
 
         await provider.refresh();
 
-        // Refresh should trigger onDidChangeTreeData
         assert.strictEqual(changeFired, true);
 
         disposable.dispose();
@@ -71,7 +69,6 @@ suite('TreeView Integration Test Suite', () => {
         assert.ok(Array.isArray(children));
         assert.ok(children.length >= 2); // Should have at least Standard Library and External Packages
 
-        // Check that root items are GoDirItem instances
         for (const child of children) {
             assert.ok(child instanceof GoDirItem);
         }
@@ -92,7 +89,6 @@ suite('TreeView Integration Test Suite', () => {
             const rootDir = rootDirs[0];
             const children = await provider.getChildren(rootDir);
             assert.ok(Array.isArray(children));
-            // Children could be empty or contain GoDirItem/GoFileItem instances
         }
 
         provider.dispose();
@@ -140,7 +136,6 @@ suite('TreeView Integration Test Suite', () => {
     });
 
     test('GoDirItem and GoFileItem have correct properties', () => {
-        // Create a mock PathElement
         const testPath = join('/test', 'path');
         const mockPathElement = new PathElement(
             'testDir',
@@ -167,14 +162,12 @@ suite('TreeView Integration Test Suite', () => {
     });
 
     test('getFsUriOfSelectedItem returns correct Uri for different item types', () => {
-        // Test with GoFileItem
         const testPath = join('/test', 'path');
         const fileItem = new GoFileItem('test.go', testPath);
         const fileUri = getFsUriOfSelectedItem(fileItem);
         assert.ok(fileUri);
         assert.strictEqual(fileUri?.fsPath, join(testPath, 'test.go'));
 
-        // Test with GoDirItem
         const mockPathElement = new PathElement(
             'testDir',
             testPath,
@@ -186,7 +179,6 @@ suite('TreeView Integration Test Suite', () => {
         assert.ok(dirUri);
         assert.strictEqual(dirUri?.fsPath, testPath);
 
-        // Test with PathElement
         const anotherPath = join('/another', 'path');
         const pathElement = new PathElement(
             'anotherDir',
@@ -198,7 +190,6 @@ suite('TreeView Integration Test Suite', () => {
         assert.ok(pathUri);
         assert.strictEqual(pathUri?.fsPath, anotherPath);
 
-        // Test with unexpected item type
         const unexpectedItem = new TreeItem('test');
         const unexpectedUri = getFsUriOfSelectedItem(unexpectedItem);
         assert.strictEqual(unexpectedUri, undefined);
@@ -216,7 +207,6 @@ suite('TreeView Integration Test Suite', () => {
         if (children.length > 0) {
             const rootDir = children[0];
 
-            // Should handle without errors
             provider.onExpand(rootDir);
             provider.onCollapse(rootDir);
         }

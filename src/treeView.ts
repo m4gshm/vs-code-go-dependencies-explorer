@@ -82,7 +82,6 @@ export async function createTreeView(ctx: ExtensionContext, treeProvider: GoDepe
           const isPackageDir = treeProvider.findDir(dir) !== undefined;
           if (isPackageDir) {
             console.debug(`set readonly dependency file ${fileUri}`);
-            //workbench.action.files.resetActiveEditorReadonlyInSession
             commands.executeCommand("workbench.action.files.setActiveEditorReadonlyInSession");
             const openPath = fsPath;
             treeView.reveal({
@@ -108,9 +107,22 @@ export async function createTreeView(ctx: ExtensionContext, treeProvider: GoDepe
     treeDataProvider.refresh(force);
   }
 
-  const handleFileEvent = async (op: string, filePattern: GlobPattern, event: Uri) => {
+  // go mod tidy etc. fire several watcher events in a burst; one full rescan is enough
+  let refreshTimer: NodeJS.Timeout | undefined;
+  const scheduleRefresh = (delayMs = 500) => {
+    if (refreshTimer) {
+      clearTimeout(refreshTimer);
+    }
+    refreshTimer = setTimeout(() => {
+      refreshTimer = undefined;
+      void refresh();
+    }, delayMs);
+  };
+  subscriptions.push({ dispose: () => refreshTimer && clearTimeout(refreshTimer) });
+
+  const handleFileEvent = (op: string, filePattern: GlobPattern, event: Uri) => {
     console.debug(`handleFileEvent: ${op}, ${filePattern}, ${event}`);
-    await refresh();
+    scheduleRefresh();
   };
 
   const filePattern = '**/go.{mod,sum}';
@@ -233,10 +245,8 @@ export class GoTreeDataProvider implements TreeDataProvider<TreeItem>, Disposabl
             if (childFound) {
               element = childFound;
             } else {
-              //log
             }
           } else {
-            //log
           }
         }
       }
@@ -328,7 +338,6 @@ export class GoTreeDataProvider implements TreeDataProvider<TreeItem>, Disposabl
 
           return newParent;
         } else {
-          //is tree root?
           return;
         }
       }
