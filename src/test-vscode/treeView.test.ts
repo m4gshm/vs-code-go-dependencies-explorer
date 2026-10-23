@@ -5,7 +5,7 @@ import { GoExec } from '../goExec';
 import { GoPackageProvider } from '../goPackageProvider';
 import { GoDependenciesStateProvider } from '../goDependenciesStateProvider';
 import { getFsUriOfSelectedItem, GoTreeDataProvider, GoDirItem, GoFileItem } from '../treeView';
-import { TreeItem, Uri, TreeItemCollapsibleState } from 'vscode';
+import { TreeItem, TreeItemCollapsibleState } from 'vscode';
 import { PathElement } from '../pathTree';
 
 suite('TreeView Integration Test Suite', () => {

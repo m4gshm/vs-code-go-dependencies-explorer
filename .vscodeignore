@@ -12,9 +12,13 @@ go_outside_replaced_package/**
 package-lock.json
 .gitignore
 .vscode-test.mjs
+vitest.config.ts
 screencast.gif
+AGENTS.md
+coverage/
 .eslintignore
 .vscode-test.mjs
 esbuild.js
 eslint.config.mjs
 tsconfig.json
+vitest.config.ts

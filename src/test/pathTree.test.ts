@@ -1,7 +1,7 @@
 import assert from 'assert';
 import { PathElement, PathTreeBuilder, flat, normalizeWinPath, RootType } from '../pathTree';
 import path from 'node:path';
-import { suite, test } from 'node:test';
+import { suite, test } from 'vitest';
 
 suite('pathTree', () => {
   test('constructor creates directory with correct properties', () => {
@@ -202,7 +202,7 @@ suite('pathTree', () => {
   });
 
   suite('normalizeWinPath', () => {
-    const runWindowsOnly = { skip: process.platform !== 'win32' ? 'Only for Windows' : false };
+    const runWindowsOnly = process.platform !== 'win32';
 
     test('on non-Windows platform returns unchanged path', () => {
       const originalPlatform = process.platform;
@@ -217,14 +217,14 @@ suite('pathTree', () => {
       }
     });
 
-    test('on Windows with uppercase drive letter converts to lowercase', runWindowsOnly, () => {
+    test.skipIf(runWindowsOnly)('on Windows with uppercase drive letter converts to lowercase', () => {
       const path = 'C:\\Windows\\System';
       const result = normalizeWinPath(path);
       assert.strictEqual(result, 'c:\\Windows\\System');
 
     });
 
-    test('on Windows with already lowercase drive letter unchanged', runWindowsOnly, () => {
+    test.skipIf(runWindowsOnly)('on Windows with already lowercase drive letter unchanged', () => {
       const path = 'c:\\Windows\\System';
       const result = normalizeWinPath(path);
       assert.strictEqual(result, path);

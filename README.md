@@ -1,37 +1,58 @@
-# Go dependencies explorer
+# Go Dependencies Explorer
 
-A VS Code extension that adds a file explorer for quickly accessing resources of Go packages — `.go` files, test files and everything inside the standard library and module dependencies.
+*File explorer for quickly accessing Go package resources.*
+
+A VS Code extension that adds an explorer view for browsing the Go standard library and external module packages — `.go` files, tests and everything else inside dependency sources.
 
 ![screencast](./screencast.gif)
 
 ## Features
 
 - **Standard Library** — browse packages and files of the Go standard library (`GOROOT/src`).
-- **External Packages** — browse packages of all modules used in the workspace (`go list -m all` + `GOMODCACHE`).
-- **ModulesReplaced** — replaced modules are shown on a separate root.
-- Open a dependency file and it is revealed in the tree, marking it read-only in the session so you do not accidentally edit a dependency.
-- Commands: refresh, search in all dependency directories, search in a directory, copy path, open in integrated terminal, reveal in OS file explorer, open directory in workspace.
-- A git repository accidentally opened inside package directories can be closed automatically (configurable via `go.dependencies.explorer.prevent.open.git.repo`: `ask` / `on` / `off`).
+- **External Packages** — browse packages of all modules used in the workspace (`go list -m all` + `GOMODCACHE`), with replaced modules shown on a separate root.
+- **Editor sync** — opening a dependency file reveals it in the tree and marks it read-only for the session, so you do not accidentally edit a dependency.
+- **Live refresh** — the view updates automatically when `go.mod`/`go.sum` change or workspace folders are added/removed (events are debounced into a single rescan).
+- **Git guard** — a git repository accidentally opened inside package directories can be closed automatically.
+- **Non-blocking** — `go` commands and directory scans run asynchronously, the extension host is never frozen.
 
-## Requirements
+## Setup
 
-- [Go extension](https://marketplace.visualstudio.com/items?itemName=golang.go) (`golang.go`) — it provides the path of the `go` binary.
+1. Install the extension (F5 in this repository, or install the packaged `.vsix`).
+2. Have the [Go extension](https://marketplace.visualstudio.com/items?itemName=golang.go) installed — it provides the path of the `go` binary, and a Go toolchain on the machine.
+3. Open a Go workspace: the **GO Dependencies** view appears in the Explorer.
 
-## Building
+## Commands
+
+| Command | Description |
+| --- | --- |
+| `Go Dependencies: Refresh` | Rescan the standard library and module packages |
+| `Go Dependencies: Search in Dependencies` | Full-text search across all dependency directories |
+| `Go Dependencies: Search in Directory` | Full-text search in the selected directory (context menu) |
+| `Go Dependencies: Copy Path` | Copy the item's file path |
+| `Go Dependencies: Open in Integrated Terminal` | Open a terminal in the selected directory |
+| `Go Dependencies: Open in Workspace` | Add the selected directory to the workspace folders |
+| `Go Dependencies: Reveal in File Explorer / Finder / Explorer View` | Reveal the item in the OS file manager |
+
+## Settings
+
+| Setting | Default | Description |
+| --- | --- | --- |
+| `go.dependencies.explorer.prevent.open.git.repo` | `ask` | Prevent opening git repositories located under "Standard Library" or "External Packages": `ask` shows a confirmation, `on` closes them silently, `off` disables the guard |
+
+## Building and testing
 
 ```bash
 npm ci
-npm run dist        # bundle with esbuild to dist/extension.js
-npm run test        # unit tests (node:test)
-npm run vscode-test # integration tests, requires a Go toolchain
-npm run package     # produce a .vsix via vsce
+npm run compile       # esbuild bundle → dist/extension.js
+npm run compile-tests # tsc → out/ (required before integration tests)
+npm run unit          # unit tests (vitest)
+npm run coverage      # unit tests + coverage report
+npm run test          # unit + bundle + integration tests (@vscode/test-electron)
+npm run package       # prepublish chain + vsce package → .vsix
 ```
 
-## Architecture (short)
+Debug with F5 (Run Extension). The integration tests use the stub Go workspace in `goWorkspace/go_stub`.
 
-- `src/extension.ts` — activation, commands, git-repository guard.
-- `src/goPackageProvider.ts` — builds package trees by walking `GOMODCACHE`/`GOROOT/src` with `fs` and `go list`; fires `onRequestPackages`.
-- `src/goDependenciesStateProvider.ts` — keeps three root trees and computes added/removed dirs on refresh.
-- `src/treeView.ts` — `TreeDataProvider`, selection sync with active editor, `go.mod`/`go.sum` file watchers.
-- `src/pathTree.ts` — path tree building/collapsing utilities (fully covered by unit tests).
-- `src/goExec.ts` — wrapper over `go env` / `go list` subprocesses.
+## License
+
+MIT

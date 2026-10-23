@@ -13,20 +13,28 @@ It depends on the `golang.go` extension (source of the `go` binary path) and
 ## Commands
 
 ```bash
-npm run compile       # tsc → out/ (required before integration tests)
-npm run dist          # esbuild bundle → dist/extension.js (dev build, sourcemaps)
-npm run dist -- --production  # minified, no sourcemaps (what gets packaged)
+npm run compile       # esbuild bundle → dist/extension.js (dev build, sourcemaps)
+npm run compile -- --production  # minified, no sourcemaps (what gets packaged)
+npm run compile-tests # tsc → out/ (required before integration tests)
 npm run check-types   # tsc --noEmit
-npm run test          # unit tests (node:test via tsx, fast, no VS Code)
-npm run test:coverage # unit tests + V8 coverage report
-npm run vscode-test   # integration tests via @vscode/test-electron (needs a Go toolchain)
+npm run unit          # vitest unit tests (fast, no VS Code)
+npm run coverage      # vitest --coverage
+npm run test          # unit + bundle + compile-tests + @vscode/test-electron integration
+npm run vscode-test   # integration tests only (needs a Go toolchain)
 npm run lint          # eslint src
-npm run build         # clean + integration + unit + lint (what CI runs)
-npm run package       # prepublish chain (clean, check-types, lint, production dist) + vsce package
+npm run build         # clean + test + lint (what CI runs)
+npm run package       # prepublish chain (clean, check-types, lint, production bundle) + vsce package
 ```
 
 Run `check-types` and `test` after every change; they are quick. On Windows
 (PowerShell) do not chain commands with `&&`.
+
+## Launch and debug
+
+Debug with F5 (Run Extension): esbuild's watch is wired through
+`npm run watch`. Integration tests require the compiled `out/`
+(`npm run compile-tests`) and use the stub Go workspace `goWorkspace/go_stub` —
+no real module cache is needed.
 
 Integration tests live in `src/test-vscode/` and require a real VS Code host,
 the Go extension and a Go toolchain — they cannot run under plain `node`.
@@ -49,7 +57,10 @@ GoTreeDataProvider → tree view`.
 | `treeView.ts` | `GoTreeDataProvider` + view wiring: selection ↔ active editor sync, read-only marking of dependency files, `go.mod`/`go.sum` watchers |
 | `gitExtension.ts`, `goExtension.ts` | Minimal API typings for the extension dependencies |
 
-Key invariants:
+## Behavioral rules (keep docs in sync!)
+
+When changing behavior, update `README.md` and the setting descriptions in
+`package.json` — avoid README/description drift. Key invariants:
 
 - `GoDependenciesStateProvider.refresh(false)` updates state silently;
   `refresh(true)` additionally returns removed/added dirs which
@@ -73,12 +84,12 @@ Key invariants:
   well-named helper instead. When editing code, delete nearby comments that
   became redundant. Tests follow the same rule: assertion names and structure
   should make the intent clear without commentary.
-- TypeScript strict mode, CommonJS sources bundled by esbuild; no build step
-  for unit tests (`tsx` runs them directly).
+- TypeScript strict mode, CommonJS sources bundled by esbuild; unit tests run
+  directly on TS sources by vitest — no build step for them.
 - Prefer keeping pure logic (trees, diffs, parsing) in `vscode`-free modules
   (`pathTree`, `goDependenciesStateProvider`) so it stays unit-testable;
   integration tests are the last resort because they are slow.
 - Errors from `go list` for a workspace module are logged, not thrown — the
   view must still render the remaining roots.
-- README is English; keep it accurate against `package.json` (commands,
-  settings, defaults must match `contributes`).
+- `README.md` is English; keep it accurate against `package.json` (commands,
+  defaults, descriptions must match `contributes`).

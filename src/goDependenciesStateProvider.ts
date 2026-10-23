@@ -73,6 +73,7 @@ export class GoDependenciesStateProvider {
                 removedStdDirs, addedStdDirs, removedModuleDirs, addedModuleDir, removedReplaced, addedReplaced
             };
         }
+        return undefined;
     }
 }
 

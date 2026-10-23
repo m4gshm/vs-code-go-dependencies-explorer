@@ -1,6 +1,6 @@
 import * as assert from 'assert';
 import { join } from 'path';
-import { suite, test } from 'node:test';
+import { suite, test } from 'vitest';
 import { GoDependenciesStateProvider } from '../goDependenciesStateProvider';
 import { GoModuleTree, GoPackageProvider, GoStdLibTree } from '../goPackageProvider';
 import { PathElement, PathTreeBuilder } from '../pathTree';

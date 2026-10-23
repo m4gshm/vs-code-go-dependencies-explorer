@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { getGoBinPath, getGoExtensionAPI, GoExtensionAPI } from '../goExtension';
+import { getGoBinPath, getGoExtensionAPI } from '../goExtension';
 import { GoExec } from '../goExec';
 import { GoPackageProvider } from '../goPackageProvider';
 import { GoDependenciesStateProvider } from '../goDependenciesStateProvider';

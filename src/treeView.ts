@@ -241,7 +241,6 @@ export class GoTreeDataProvider implements TreeDataProvider<TreeItem>, Disposabl
           if (parent) {
             const children = await this.getChildren(parent);
             const childFound = children.find(e => e.id === id);
-            const childFound2 = this.elements.get(id);
             if (childFound) {
               element = childFound;
             } else {
