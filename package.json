@@ -140,9 +140,8 @@
   "scripts": {
     "clean": "rimraf ./dist ./out",
     "check-types": "tsc --noEmit",
-    "prepackage": "npm run build",
-    "package": "npx vsce ls && npx vsce package",
-    "vscode:prepublish": "npm run clean && npm run dist && npm run lint",
+    "package": "npm run vscode:prepublish && npx vsce ls && npx vsce package --no-dependencies",
+    "vscode:prepublish": "npm run clean && npm run check-types && npm run lint && npm run dist -- --production",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "dist": "node esbuild.js",

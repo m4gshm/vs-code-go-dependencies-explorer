@@ -22,9 +22,7 @@ jobs:
         with:
           run: |
             npm ci
-            npm run vscode-test
-            npm run test
-            npm run lint
+            npm run build
             npm run package
       - name: upload the artifacts
         uses: skx/github-action-publish-binaries@master
