@@ -138,21 +138,20 @@
     }
   },
   "scripts": {
-    "rimraf": "./node_modules/rimraf/bin.js",
     "clean": "rimraf ./dist ./out",
     "check-types": "tsc --noEmit",
     "prepackage": "npm run build",
     "package": "npx vsce ls && npx vsce package",
-    "vscode:prepublish": "npm run clean && npm run build",
+    "vscode:prepublish": "npm run clean && npm run dist && npm run lint",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "predist": "npm run compile",
     "dist": "node esbuild.js",
     "dist-watch": "node esbuild.js --watch",
     "lint": "eslint src",
     "test": "node --import tsx --test src/test/**/*.test.ts",
-    "prevscode-test": "npm run dist",
+    "test:coverage": "node --import tsx --test --experimental-test-coverage \"src/test/**/*.test.ts\"",
     "vscode-test": "vscode-test",
+    "prevscode-test": "npm run dist && npm run compile",
     "build": "npm run clean && npm run vscode-test && npm run test && npm run lint"
   },
   "devDependencies": {

@@ -7,6 +7,7 @@ export type WorkDir = string | URL | undefined;
 
 export class GoExec {
     private readonly _goPath: string;
+    private _envCache: Record<string, string> | undefined;
     public get goPath(): string {
         return this._goPath;
     }
@@ -37,10 +38,19 @@ export class GoExec {
     }
 
     public getEnv(workDir: WorkDir = undefined) {
+        if (workDir === undefined) {
+            if (!this._envCache) {
+                this._envCache = this.goEnv(workDir);
+            }
+            return this._envCache;
+        }
+        return this.goEnv(workDir);
+    }
+
+    private goEnv(workDir: WorkDir = undefined) {
         const cmd = ['env', '-json'];
         const result = this.execGo(cmd, workDir);
-        const rawJson = JSON.parse(result.stdout);
-        return rawJson;
+        return JSON.parse(result.stdout) as Record<string, string>;
     }
 
     public getModules(moduleName: string | undefined = undefined, workDir: string) {

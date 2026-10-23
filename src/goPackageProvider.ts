@@ -78,9 +78,8 @@ async function getGoPackages(goExec: GoExec): Promise<[GoStdLibTree, GoModuleTre
         for (const wdm of workDirModules) {
             const err = wdm.error;
             if (err) {
-                const moduelDir = wdm.baseDir;
                 const message = err instanceof Error ? err.message : `${err}`;
-                const errMessage = `Module error: '${moduelDir}', ${message}`;
+                const errMessage = `Module error: '${wdm.baseDir}', ${message}`;
                 console.info(errMessage);
             } else {
                 for (const module of wdm.modules) {
@@ -111,33 +110,24 @@ async function getGoPackages(goExec: GoExec): Promise<[GoStdLibTree, GoModuleTre
 
 
 function listGoPackageDirs(dirPath: string): string[] {
-    const dir = fs.opendirSync(dirPath);
+    let entries: fs.Dirent[];
     try {
-        const path = dir.path;
-        let isGoPackage = false;
-        let subPackages: string[] = [];
-        for (; ;) {
-            let sub: fs.Dirent | null;
-            try {
-                sub = dir.readSync();
-            } catch (err) {
-                console.error("dir.readSync error:", err);
-                continue;
-            }
-            if (sub === null) {
-                break;
-            }
-            const isGoFile = sub.isFile() && sub.name.endsWith('.go');
-            isGoPackage = isGoPackage || isGoFile;
-            if (sub.isDirectory()) {
-                subPackages.push(...(listGoPackageDirs(join(sub.parentPath, sub.name))));
-            }
-        }
-        const result = isGoPackage ? [path] : [];
-        return subPackages ? [...result, ...subPackages] : result;
-    } finally {
-        dir.closeSync();
+        entries = fs.readdirSync(dirPath, { withFileTypes: true });
+    } catch (err) {
+        console.error(`readdir error for ${dirPath}:`, err);
+        return [];
     }
+    let isGoPackage = false;
+    let subPackages: string[] = [];
+    for (const sub of entries) {
+        if (sub.isFile() && sub.name.endsWith('.go')) {
+            isGoPackage = true;
+        } else if (sub.isDirectory()) {
+            subPackages.push(...listGoPackageDirs(join(sub.parentPath, sub.name)));
+        }
+    }
+    const result = isGoPackage ? [normalizeWinPath(dirPath)] : [];
+    return subPackages.length > 0 ? [...result, ...subPackages] : result;
 }
 
 

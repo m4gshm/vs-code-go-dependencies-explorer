@@ -27,9 +27,6 @@ export class GoDependenciesStateProvider {
     }
 
     async refresh(calcChanges: boolean = false) {
-        const convertToGoDirs = (flatDirs: Map<string, PathElement>) => flatDirs/* new Map(Array.from(flatDirs.entries())
-            .map(([fullPath, dir]) => [fullPath, newGoDirItem(dir)]))*/;
-
         const [std, modules] = await this.packageProvider.getPackages();
 
         const newStdLibRootDir = std.root.with({ name: 'Standard Library' });;
@@ -37,7 +34,7 @@ export class GoDependenciesStateProvider {
         this._stdLibRootDir = newStdLibRootDir;
         const oldStdLibDirs = this._stdLibDirs;
 
-        const newStdLibDirs = convertToGoDirs(flat([newStdLibRootDir]));
+        const newStdLibDirs = flat([newStdLibRootDir]);
         this._stdLibDirs = newStdLibDirs;
 
         const root = modules.root;
@@ -46,7 +43,7 @@ export class GoDependenciesStateProvider {
         this._modulesRootDir = newModulesRootDir;
 
         const oldModuleDirs = this._moduleDirs;
-        const newModuleDirs = convertToGoDirs(flat(newModulesRootDir ? [newModulesRootDir] : []));
+        const newModuleDirs = flat(newModulesRootDir ? [newModulesRootDir] : []);
 
         this._moduleDirs = newModuleDirs;
 
@@ -60,7 +57,7 @@ export class GoDependenciesStateProvider {
         this._replacedRootDir = newReplacedRootDir;
 
         const oldReplaced = this._replacedDirs;
-        const newReplaced = convertToGoDirs(newReplacedRootDir ? flat([newReplacedRootDir]) : new Map<string, PathElement>());
+        const newReplaced = flat(newReplacedRootDir ? [newReplacedRootDir] : []);
         this._replacedDirs = newReplaced;
 
         if (calcChanges) {

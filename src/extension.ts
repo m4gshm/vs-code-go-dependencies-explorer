@@ -1,24 +1,25 @@
-import * as vscode from 'vscode';
+import {
+    commands, extensions, ExtensionContext, Uri, window, workspace,
+} from 'vscode';
 import { createTreeView, getFsUriOfSelectedItem, GoDirItem } from "./treeView";
 import { GoExec } from './goExec';
 import { getGoBinPath, getGoExtensionAPI, GoExtensionAPI } from './goExtension';
 import { GitExtension } from './gitExtension';
 import { GoPackageProvider } from './goPackageProvider';
 import { getGoPackagePaths } from './goDirs';
-import { commands, Uri, workspace } from 'vscode';
 import { IFindInFilesArgs } from './search';
 import { GoDependenciesStateProvider } from './goDependenciesStateProvider';
 
 let activated: boolean;
 
-export async function activate(context: vscode.ExtensionContext): Promise<any> {
+export async function activate(context: ExtensionContext): Promise<any> {
     const subscriptions = context.subscriptions;
     const goExtensionApi = await getGoExtensionAPI();
     if (goExtensionApi) {
         return await activateWithGo(context, goExtensionApi);
     } else {
         console.log('Waiting for Go extension to activate');
-        return subscriptions.push(vscode.extensions.onDidChange(async e => {
+        return subscriptions.push(extensions.onDidChange(async e => {
             if (!activated) {
                 const goExtensionApi = await getGoExtensionAPI();
                 if (goExtensionApi) {
@@ -29,13 +30,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<any> {
     }
 }
 
-async function activateWithGo(context: vscode.ExtensionContext, goExtensionApi: GoExtensionAPI,) {
+async function activateWithGo(context: ExtensionContext, goExtensionApi: GoExtensionAPI,) {
     const goExec = new GoExec(getGoBinPath(goExtensionApi));
 
     const rootConfig = 'go.dependencies.explorer';
-    const conf = vscode.workspace.getConfiguration(rootConfig);
+    const conf = workspace.getConfiguration(rootConfig);
 
-    const gitExtension = vscode.extensions.getExtension('vscode.git');
+    const gitExtension = extensions.getExtension('vscode.git');
     if (gitExtension) {
         const isActive = gitExtension.isActive;
         const gitExtensionApi: GitExtension | undefined = !isActive ? await gitExtension.activate() : gitExtension.exports;
@@ -52,12 +53,12 @@ async function activateWithGo(context: vscode.ExtensionContext, goExtensionApi: 
                         if (rootPath.startsWith(dir) || dir.startsWith(rootPath)) {
                             let close = true;
                             if (preventOpenRepo === 'ask') {
-                                const selection = await vscode.window.showWarningMessage(`Should the git repository "${rootPath}" be closed?`, 'Close', 'Cancel');
+                                const selection = await window.showWarningMessage(`Should the git repository "${rootPath}" be closed?`, 'Close', 'Cancel');
                                 close = selection === 'Close';
                             }
                             if (close) {
                                 console.debug(`closes git repository intersecting with package directory (repo: ${rootPath}, packages dir: ${dir})`);
-                                await vscode.commands.executeCommand('git.close', repository);
+                                await commands.executeCommand('git.close', repository);
                             }
                         }
                     });
@@ -80,7 +81,7 @@ async function activateWithGo(context: vscode.ExtensionContext, goExtensionApi: 
             const rootDirs = treeProvider.rootDirs;
             const dirs = rootDirs.map(dir => getFsUriOfSelectedItem(dir))
                 .filter(d => d !== undefined).map(uri => uri.fsPath)
-                .reduce((l, r) => l + "," + r);
+                .join(",");
 
             await commands.executeCommand("workbench.action.findInFiles", {
                 filesToInclude: dirs,

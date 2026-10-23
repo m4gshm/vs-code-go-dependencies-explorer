@@ -33,7 +33,7 @@ export async function createTreeView(ctx: ExtensionContext, treeProvider: GoDepe
             document => window.showTextDocument(document)
           );
         } else {
-          console.warn(`selected FileItem withoud id ${selection}`);
+          console.warn(`selected FileItem without id ${selection}`);
         }
       }
     }
