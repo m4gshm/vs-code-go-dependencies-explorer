@@ -22,6 +22,12 @@ function promisifyExecFile() {
 
 export type WorkDir = string | URL | undefined;
 
+export interface GoModule {
+    path: string;
+    dir: string;
+    replaced: boolean;
+}
+
 export class GoExec {
     private readonly _goPath: string;
     private _envCache: Record<string, string> | undefined;
@@ -67,10 +73,14 @@ export class GoExec {
     private async goEnv(workDir: WorkDir = undefined): Promise<Record<string, string>> {
         const cmd = ['env', '-json'];
         const result = await this.execGo(cmd, workDir);
-        return JSON.parse(result.stdout);
+        try {
+            return JSON.parse(result.stdout);
+        } catch (err) {
+            throw new Error(`failed to parse output of 'go ${cmd.join(' ')}': ${(err as Error).message}`);
+        }
     }
 
-    public async getModules(moduleName: string | undefined = undefined, workDir: string) {
+    public async getModules(moduleName: string | undefined = undefined, workDir: string): Promise<GoModule[]> {
         const delim = '=>';
         const replaced = 'replaced';
         const args = ['list', '-f', '{{.Path}}' + delim + '{{.Dir}}' + delim + '{{if not (eq .Replace nil)}}' + replaced + '{{end}}', '-m', '-e'];
@@ -78,14 +88,16 @@ export class GoExec {
             args.push(moduleName);
         }
         const result = await this.execGo(args, workDir);
-        const modules = result.stdout.split('\n').filter(line => line.length > 0).map(pair => {
-            const parts = pair.split(delim);
+        return result.stdout.split('\n').filter(line => line.length > 0).map(line => {
+            const parts = line.split(delim);
             const path = parts[0];
-            const dir = parts[1];
-            const replaced = parts[2];
-            return { dir: normalizeWinPath(dir), path: path, replaced: replaced === "replaced" };
+            const dir = parts.length > 1 ? parts[1] : '';
+            return {
+                path: path,
+                dir: dir ? normalizeWinPath(dir) : '',
+                replaced: parts[2] === replaced,
+            };
         }).filter(module => module.dir.length > 0);
-        return modules;
     }
 
     private execGo(args: string[], workDir: WorkDir = undefined, throwStdErr = true) {

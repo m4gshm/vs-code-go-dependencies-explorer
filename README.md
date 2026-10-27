@@ -12,6 +12,7 @@ A VS Code extension that adds an explorer view for browsing the Go standard libr
 - **External Packages** — browse packages of all modules used in the workspace (`go list -m all` + `GOMODCACHE`), with replaced modules shown on a separate root.
 - **Editor sync** — opening a dependency file reveals it in the tree and marks it read-only for the session, so you do not accidentally edit a dependency.
 - **Live refresh** — the view updates automatically when `go.mod`/`go.sum` change or workspace folders are added/removed (events are debounced into a single rescan).
+- **Progress** — rescans show progress on the view itself.
 - **Git guard** — a git repository accidentally opened inside package directories can be closed automatically.
 - **Non-blocking** — `go` commands and directory scans run asynchronously, the extension host is never frozen.
 
@@ -29,6 +30,8 @@ A VS Code extension that adds an explorer view for browsing the Go standard libr
 | `Go Dependencies: Search in Dependencies` | Full-text search across all dependency directories |
 | `Go Dependencies: Search in Directory` | Full-text search in the selected directory (context menu) |
 | `Go Dependencies: Copy Path` | Copy the item's file path |
+| `Go Dependencies: Copy Import Path` | Copy the Go import path of the selected directory (context menu) |
+| `Go Dependencies: Open on pkg.go.dev` | Open the module documentation on pkg.go.dev (context menu) |
 | `Go Dependencies: Open in Integrated Terminal` | Open a terminal in the selected directory |
 | `Go Dependencies: Open in Workspace` | Add the selected directory to the workspace folders |
 | `Go Dependencies: Reveal in File Explorer / Finder / Explorer View` | Reveal the item in the OS file manager |

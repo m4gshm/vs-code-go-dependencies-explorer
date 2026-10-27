@@ -1,5 +1,5 @@
 import {
-    commands, extensions, ExtensionContext, Uri, window, workspace,
+    commands, env, extensions, ExtensionContext, Uri, window, workspace,
 } from 'vscode';
 import { createTreeView, getFsUriOfSelectedItem, GoDirItem } from "./treeView";
 import { GoExec } from './goExec';
@@ -9,6 +9,7 @@ import { GoPackageProvider } from './goPackageProvider';
 import { getGoPackagePaths } from './goDirs';
 import { IFindInFilesArgs } from './search';
 import { GoDependenciesStateProvider } from './goDependenciesStateProvider';
+import { importPathOfDir, modulePathOfDir } from './goModulePath';
 
 let activated: boolean;
 let activating: Promise<any> | undefined;
@@ -33,83 +34,126 @@ export async function activate(context: ExtensionContext): Promise<any> {
     }
 }
 
-async function activateWithGo(context: ExtensionContext, goExtensionApi: GoExtensionAPI,) {
-    const goExec = new GoExec(getGoBinPath(goExtensionApi));
+async function activateWithGo(context: ExtensionContext, goExtensionApi: GoExtensionAPI) {
+    try {
+        const goExec = new GoExec(getGoBinPath(goExtensionApi));
 
+        await registerGitRepoGuard(context, goExec);
+
+        const goPackDirProvider = new GoPackageProvider(goExec);
+        const treeProvider = await GoDependenciesStateProvider.new(goPackDirProvider);
+
+        const { refresh } = await createTreeView(context, treeProvider);
+
+        registerCommands(context, goExec, treeProvider, refresh);
+
+        console.log('Go Dependencies Explorer activated');
+        await commands.executeCommand('setContext', 'go.dependencies.explorer.show', true);
+
+        activated = true;
+    } catch (err) {
+        const message = err instanceof Error ? err.message : `${err}`;
+        void window.showErrorMessage(`Go Dependencies Explorer activation failed: ${message}`);
+        throw err;
+    }
+}
+
+async function registerGitRepoGuard(context: ExtensionContext, goExec: GoExec) {
+    const gitExtension = extensions.getExtension<GitExtension>('vscode.git');
+    if (!gitExtension) {
+        return;
+    }
+    const gitExtensionApi = gitExtension.isActive ? gitExtension.exports : await gitExtension.activate();
+    const gitApi = gitExtensionApi?.getAPI(1);
+    if (!gitApi) {
+        return;
+    }
     const rootConfig = 'go.dependencies.explorer';
     const conf = workspace.getConfiguration(rootConfig);
 
-    const gitExtension = extensions.getExtension('vscode.git');
-    if (gitExtension) {
-        const isActive = gitExtension.isActive;
-        const gitExtensionApi: GitExtension | undefined = !isActive ? await gitExtension.activate() : gitExtension.exports;
-        const gitApi = gitExtensionApi?.getAPI(1);
-        if (gitApi) {
-            context.subscriptions.push(gitApi.onDidOpenRepository(async repository => {
-                const preventOpenRepo = conf.get('prevent.open.git.repo');
-                if (!(!preventOpenRepo || preventOpenRepo === 'off')) {
-                    const rootUri = repository.rootUri;
-                    const rootPath = rootUri.fsPath;
-
-                    const { stdLibPath: stdLibPath, modulePath: modulesPath } = await getGoPackagePaths(goExec);
-                    [stdLibPath, modulesPath].forEach(async dir => {
-                        if (rootPath.startsWith(dir) || dir.startsWith(rootPath)) {
-                            let close = true;
-                            if (preventOpenRepo === 'ask') {
-                                const selection = await window.showWarningMessage(`Should the git repository "${rootPath}" be closed?`, 'Close', 'Cancel');
-                                close = selection === 'Close';
-                            }
-                            if (close) {
-                                console.debug(`closes git repository intersecting with package directory (repo: ${rootPath}, packages dir: ${dir})`);
-                                await commands.executeCommand('git.close', repository);
-                            }
-                        }
-                    });
-                }
-            }));
+    context.subscriptions.push(gitApi.onDidOpenRepository(async repository => {
+        const preventOpenRepo = conf.get('prevent.open.git.repo');
+        if (!preventOpenRepo || preventOpenRepo === 'off') {
+            return;
         }
-    }
+        const rootPath = repository.rootUri.fsPath;
+        const { stdLibPath, modulePath } = await getGoPackagePaths(goExec);
+        for (const dir of [stdLibPath, modulePath]) {
+            if (rootPath.startsWith(dir) || dir.startsWith(rootPath)) {
+                let close = true;
+                if (preventOpenRepo === 'ask') {
+                    const selection = await window.showWarningMessage(`Should the git repository "${rootPath}" be closed?`, 'Close', 'Cancel');
+                    close = selection === 'Close';
+                }
+                if (close) {
+                    console.debug(`closes git repository intersecting with package directory (repo: ${rootPath}, packages dir: ${dir})`);
+                    await commands.executeCommand('git.close', repository);
+                }
+            }
+        }
+    }));
+}
 
-    const goPackDirProvider = new GoPackageProvider(goExec);
-
-    const treeProvider = await GoDependenciesStateProvider.new(goPackDirProvider);
-
-    const { refresh } = await createTreeView(context, treeProvider);
-
+function registerCommands(context: ExtensionContext, goExec: GoExec, treeProvider: GoDependenciesStateProvider, refresh: (force?: boolean) => Promise<void>) {
     const subscriptions = context.subscriptions;
+
+    const searchIn = async (filesToInclude: string) => {
+        await commands.executeCommand("workbench.action.findInFiles", {
+            filesToInclude,
+            triggerSearch: false,
+        } as IFindInFilesArgs);
+    };
+
+    const getModulesPath = async () => (await getGoPackagePaths(goExec)).modulePath;
 
     subscriptions.push(
         commands.registerCommand('go.dependencies.refresh', async () => await refresh(true)),
         commands.registerCommand('go.dependencies.search.in.all.directories', async _ => {
-            const rootDirs = treeProvider.rootDirs;
-            const dirs = rootDirs.map(dir => getFsUriOfSelectedItem(dir))
-                .filter(d => d !== undefined).map(uri => uri.fsPath)
+            const dirs = treeProvider.rootDirs
+                .map(dir => getFsUriOfSelectedItem(dir))
+                .filter(uri => uri !== undefined).map(uri => uri.fsPath)
                 .join(",");
-
-            await commands.executeCommand("workbench.action.findInFiles", {
-                filesToInclude: dirs,
-                triggerSearch: false,
-            } as IFindInFilesArgs);
-        }), commands.registerCommand('go.dependencies.search.in.directory', async item => {
+            await searchIn(dirs);
+        }),
+        commands.registerCommand('go.dependencies.search.in.directory', async item => {
             const uri = getFsUriOfSelectedItem(item);
             if (uri) {
-                await commands.executeCommand("workbench.action.findInFiles", {
-                    filesToInclude: uri.fsPath,
-                    triggerSearch: false,
-                } as IFindInFilesArgs);
+                await searchIn(uri.fsPath);
             }
-        }), commands.registerCommand('go.dependencies.open.in.workspace', async item => {
+        }),
+        commands.registerCommand('go.dependencies.open.in.workspace', async item => {
             if (item instanceof GoDirItem) {
                 const path = item.id;
-                const uri = path ? Uri.file(path) : undefined;
-                if (uri) {
+                if (path) {
                     const workspaceFolders = workspace.workspaceFolders;
-                    workspace.updateWorkspaceFolders(workspaceFolders ? workspaceFolders.length : 0, null, { uri: uri, });
+                    workspace.updateWorkspaceFolders(workspaceFolders ? workspaceFolders.length : 0, null, { uri: Uri.file(path) });
                 }
             }
-        }), commands.registerCommand('go.dependencies.copy.path', async item => {
+        }),
+        commands.registerCommand('go.dependencies.copy.path', async item => {
             await execCommandOnItem('copyFilePath', item);
-        }), commands.registerCommand('go.dependencies.open.in.integrated.terminal', async item => {
+        }),
+        commands.registerCommand('go.dependencies.copy.import.path', async item => {
+            const path = itemPathOf(item);
+            if (!path) {
+                return;
+            }
+            const importPath = importPathOfDir(path, await getModulesPath());
+            if (importPath) {
+                await env.clipboard.writeText(importPath);
+            }
+        }),
+        commands.registerCommand('go.dependencies.open.on.pkg.go.dev', async item => {
+            const path = itemPathOf(item);
+            if (!path) {
+                return;
+            }
+            const modulePath = modulePathOfDir(path, await getModulesPath());
+            if (modulePath) {
+                await commands.executeCommand('vscode.open', Uri.parse(`https://pkg.go.dev/${modulePath}`));
+            }
+        }),
+        commands.registerCommand('go.dependencies.open.in.integrated.terminal', async item => {
             await execCommandOnItem('openInIntegratedTerminal', item);
         }),
     );
@@ -119,11 +163,11 @@ async function activateWithGo(context: ExtensionContext, goExtensionApi: GoExten
             await execCommandOnItem('revealFileInOS', item);
         }));
     });
+}
 
-    console.log('Go Dependencies Explorer activated');
-    commands.executeCommand('setContext', 'go.dependencies.explorer.show', true);
-
-    activated = true;
+function itemPathOf(item: any): string | undefined {
+    const uri = getFsUriOfSelectedItem(item);
+    return uri?.fsPath;
 }
 
 export function deactivate() {
@@ -132,7 +176,7 @@ export function deactivate() {
 }
 
 async function execCommandOnItem(command: string, item: any) {
-    let uri = getFsUriOfSelectedItem(item);
+    const uri = getFsUriOfSelectedItem(item);
     if (uri) {
         await commands.executeCommand(command, uri);
     }

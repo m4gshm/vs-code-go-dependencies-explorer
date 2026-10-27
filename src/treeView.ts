@@ -1,11 +1,11 @@
 import { join, parse } from 'path';
 import {
-  commands, EventEmitter, FileType, GlobPattern, Tab, TabInputText,
+  commands, EventEmitter, FileType,
   TreeItem,
   Uri, window, workspace,
   ExtensionContext,
   TreeDataProvider, Event, Disposable,
-  TreeItemCollapsibleState
+  TreeItemCollapsibleState, Tab, TabInputText
 } from 'vscode';
 import { GoDependenciesStateProvider } from './goDependenciesStateProvider';
 import { PathElement } from './pathTree';
@@ -22,15 +22,14 @@ export async function createTreeView(ctx: ExtensionContext, treeProvider: GoDepe
   subscriptions.push(treeView);
 
   subscriptions.push(treeView.onDidChangeSelection(async event => {
-    const selections = event.selection;
-    for (const selection of selections) {
-      treeDataProvider.onSelect(selection);
+    for (const selection of event.selection) {
       if (selection instanceof GoFileItem) {
         const id = selection.id;
         if (id) {
           const fileUri = Uri.file(id);
           await workspace.openTextDocument(fileUri).then(
-            document => window.showTextDocument(document)
+            document => window.showTextDocument(document),
+            err => console.warn(`failed to open document ${id}:`, err)
           );
         } else {
           console.warn(`selected FileItem without id ${selection}`);
@@ -65,35 +64,29 @@ export async function createTreeView(ctx: ExtensionContext, treeProvider: GoDepe
   }));
 
   function selectFileOfActiveTabInTree(tab: Tab) {
-    if (tab.isActive) {
-      const input = tab.input;
-      const textInput = input instanceof TabInputText ? input as TabInputText : undefined;
-      if (textInput) {
-        const fileUri = textInput.uri;
-        const workspaceFolders = workspace.workspaceFolders;
-        const workspaceFolder = workspaceFolders?.find(folder => {
-          const found = fileUri.fsPath.startsWith(folder.uri.fsPath);
-          return found;
-        });
-        if (!workspaceFolder) {
-          const fsPath = fileUri.fsPath;
-          const filePath = parse(fsPath);
-          const dir = filePath.dir;
-          const isPackageDir = treeProvider.findDir(dir) !== undefined;
-          if (isPackageDir) {
-            console.debug(`set readonly dependency file ${fileUri}`);
-            commands.executeCommand("workbench.action.files.setActiveEditorReadonlyInSession");
-            const openPath = fsPath;
-            treeView.reveal({
-              id: openPath
-            }, {
-              focus: true,
-              select: true,
-            });
-          }
-        }
-      }
+    if (!tab.isActive) {
+      return;
     }
+    const input = tab.input;
+    const textInput = input instanceof TabInputText ? input as TabInputText : undefined;
+    if (!textInput) {
+      return;
+    }
+    const fileUri = textInput.uri;
+    const fsPath = fileUri.fsPath;
+    if (isFileInWorkspace(fsPath)) {
+      return;
+    }
+    if (treeProvider.findDir(parse(fsPath).dir) === undefined) {
+      return;
+    }
+    console.debug(`set readonly dependency file ${fileUri}`);
+    commands.executeCommand("workbench.action.files.setActiveEditorReadonlyInSession");
+    treeView.reveal({ id: fsPath }, { focus: true, select: true });
+  }
+
+  function isFileInWorkspace(fsPath: string) {
+    return !!workspace.workspaceFolders?.some(folder => fsPath.startsWith(folder.uri.fsPath));
   }
 
   function syncSelectedFileWithActiveTab() {
@@ -104,40 +97,16 @@ export async function createTreeView(ctx: ExtensionContext, treeProvider: GoDepe
   }
 
   async function refresh(force = false) {
-    treeDataProvider.refresh(force);
+    await window.withProgress({ location: { viewId: "go.dependencies.explorer" } },
+      () => treeDataProvider.refresh(force));
   }
 
-  // go mod tidy etc. fire several watcher events in a burst; one full rescan is enough
-  let refreshTimer: NodeJS.Timeout | undefined;
-  const scheduleRefresh = (delayMs = 500) => {
-    if (refreshTimer) {
-      clearTimeout(refreshTimer);
-    }
-    refreshTimer = setTimeout(() => {
-      refreshTimer = undefined;
-      void refresh();
-    }, delayMs);
-  };
-  subscriptions.push({ dispose: () => refreshTimer && clearTimeout(refreshTimer) });
-
-  const handleFileEvent = (op: string, filePattern: GlobPattern, event: Uri) => {
-    console.debug(`handleFileEvent: ${op}, ${filePattern}, ${event}`);
-    scheduleRefresh();
-  };
-
-  const filePattern = '**/go.{mod,sum}';
-  const gofileWatcher = workspace.createFileSystemWatcher(filePattern);
-  gofileWatcher.onDidCreate(e => handleFileEvent('create', filePattern, e));
-  gofileWatcher.onDidChange(e => handleFileEvent('change', filePattern, e));
-  gofileWatcher.onDidDelete(e => handleFileEvent('delete', filePattern, e));
-  subscriptions.push(gofileWatcher);
-
-  const workspaceListener = workspace.onDidChangeWorkspaceFolders(event => {
+  subscriptions.push(registerGoModWatcher(() => refresh()));
+  subscriptions.push(workspace.onDidChangeWorkspaceFolders(event => {
     console.debug(`handle workspace folders changing, added: ${event.added}, removed: ${event.removed}`);
-    refresh();
+    void refresh();
     syncSelectedFileWithActiveTab();
-  });
-  subscriptions.push(workspaceListener);
+  }));
 
   await refresh();
   syncSelectedFileWithActiveTab();
@@ -145,28 +114,39 @@ export async function createTreeView(ctx: ExtensionContext, treeProvider: GoDepe
   return { treeView, refresh };
 }
 
+function registerGoModWatcher(scheduleRefresh: () => void): Disposable {
+  const filePattern = '**/go.{mod,sum}';
+  // go mod tidy etc. fire several watcher events in a burst; one full rescan is enough
+  let refreshTimer: NodeJS.Timeout | undefined;
+  const scheduleDebounced = (delayMs = 500) => {
+    if (refreshTimer) {
+      clearTimeout(refreshTimer);
+    }
+    refreshTimer = setTimeout(() => {
+      refreshTimer = undefined;
+      scheduleRefresh();
+    }, delayMs);
+  };
+  const watcher = workspace.createFileSystemWatcher(filePattern);
+  watcher.onDidCreate(() => scheduleDebounced());
+  watcher.onDidChange(() => scheduleDebounced());
+  watcher.onDidDelete(() => scheduleDebounced());
+  return new Disposable(() => {
+    clearTimeout(refreshTimer);
+    watcher.dispose();
+  });
+}
+
 export function getFsUriOfSelectedItem(item: TreeItem | PathElement) {
-  let uri: Uri | undefined;
-  if (item instanceof GoFileItem) {
-    const path = item.id;
-    if (path) {
-      uri = Uri.file(path);
-    } else {
-      console.warn("undefined path of file item:", item);
-    }
-  } else if (item instanceof GoDirItem) {
-    const path = item.id;
-    if (path) {
-      uri = Uri.file(path);
-    } else {
-      console.warn("undefined path of dir item:", item);
-    }
-  } else if (item instanceof PathElement) {
-    uri = Uri.file(item.path);
-  } else {
-    console.warn("unexpected item type:", item);
+  if (item instanceof PathElement) {
+    return Uri.file(item.path);
   }
-  return uri;
+  const path = item.id;
+  if (!path) {
+    console.warn("undefined path of item:", item);
+    return undefined;
+  }
+  return Uri.file(path);
 }
 
 export class GoTreeDataProvider implements TreeDataProvider<TreeItem>, Disposable {
@@ -205,62 +185,43 @@ export class GoTreeDataProvider implements TreeDataProvider<TreeItem>, Disposabl
     this._onDidChangeTreeData.fire(undefined);
   }
 
-  private deleteState(id: string, deepCheck = 10000) {
-    if (deepCheck <= 0) {
-      throw Error('overflow');
-    }
+  private deleteState(id: string) {
     const element = this.elements.get(id);
-    if (element) {
-      const children = this.children.get(id) || new Set();
-      for (const childId of children) {
-        if (childId) {
-          this.deleteState(childId, deepCheck - 1);
-        }
-      }
-      this.elements.delete(id);
-      this.children.delete(id);
-      this.parents.delete(id);
-      this.expanded.delete(id);
+    if (!element) {
+      return;
     }
+    const children = this.children.get(id) || new Set();
+    for (const childId of children) {
+      if (childId) {
+        this.deleteState(childId);
+      }
+    }
+    this.elements.delete(id);
+    this.children.delete(id);
+    this.parents.delete(id);
+    this.expanded.delete(id);
   }
 
   async getTreeItem(element: TreeItem) {
     const id = element.id;
+    if (!id) {
+      return element;
+    }
 
-    if (id) {
-      const found = this.elements.get(id);
-      if (found) {
-        element = found;
-      } else {
-        if (element instanceof GoDirItem) {
-          this.addElement(element);
-        } else if (element instanceof GoFileItem) {
-          this.addElement(element);
-        } else {
-          const parent = await this.getParent(element);
-          if (parent) {
-            const children = await this.getChildren(parent);
-            const childFound = children.find(e => e.id === id);
-            if (childFound) {
-              element = childFound;
-            } else {
-            }
-          } else {
-          }
-        }
-      }
+    const found = this.elements.get(id);
+    if (found) {
+      element = found;
+    } else if (element instanceof GoDirItem || element instanceof GoFileItem) {
+      this.addElement(element);
+    }
 
-      if (element instanceof GoDirItem) {
-        const expanded = this.expanded.has(id);
-        if (expanded) {
-          element.collapsibleState = TreeItemCollapsibleState.Expanded;
-        } else if (element.collapsibleState === TreeItemCollapsibleState.Expanded) {
-          element.collapsibleState = TreeItemCollapsibleState.Expanded;
-          this.expanded.add(id);
-        } else if (element.collapsibleState === TreeItemCollapsibleState.Collapsed && expanded) {
-          this.expanded.delete(id);
-        }
+    if (element instanceof GoDirItem) {
+      if (!this.expanded.has(id) && element.collapsibleState === TreeItemCollapsibleState.Expanded) {
+        this.expanded.add(id);
       }
+      element.collapsibleState = this.expanded.has(id)
+        ? TreeItemCollapsibleState.Expanded
+        : TreeItemCollapsibleState.Collapsed;
     }
     return element;
   }
@@ -277,7 +238,7 @@ export class GoTreeDataProvider implements TreeDataProvider<TreeItem>, Disposabl
     } else {
       const rootElements = !element ? Array.from(this.treeProvider.rootDirs.map(d => {
         const element = this.elements.get(d.path);
-        return element && element instanceof GoDirItem ? element : this.addElement(newGoDirItem(d));
+        return element && element instanceof GoDirItem ? element : this.addElement(new GoDirItem(d));
       })) : [];
       return rootElements;
     }
@@ -293,7 +254,7 @@ export class GoTreeDataProvider implements TreeDataProvider<TreeItem>, Disposabl
       return new GoFileItem(filename, dir.path!!);
     });
 
-    const subdirs = dir.children.map(d => newGoDirItem(d));
+    const subdirs = dir.children.map(d => new GoDirItem(d));
     const children = [...subdirs, ...files];
 
     this.linkElements(element, children);
@@ -303,47 +264,40 @@ export class GoTreeDataProvider implements TreeDataProvider<TreeItem>, Disposabl
   }
 
   async getParent(element: TreeItem): Promise<TreeItem | undefined> {
-    const id = element.id;
-    if (!id) {
-      return;
+    let childId = element.id;
+    if (!childId) {
+      return undefined;
     }
-
-    let nextLevelPerantPath = id;
     while (true) {
-      const parentId = this.parents.get(nextLevelPerantPath);
+      const parentId = this.parents.get(childId);
       const parent = parentId ? this.elements.get(parentId) : undefined;
       if (parent) {
         return parent;
       }
 
-      const path = parse(nextLevelPerantPath);
-      const isSystemRoot = path.root === path.dir && path.base.length === 0;
+      const parsed = parse(childId);
+      const isSystemRoot = parsed.root === parsed.dir && parsed.base.length === 0;
       if (isSystemRoot) {
-        return;
+        return undefined;
       }
+      childId = parsed.dir;
 
-      nextLevelPerantPath = path.dir;
-
-      let newParent = this.elements.get(nextLevelPerantPath);
-      if (newParent) {
-        await this.initChildren(newParent as GoDirItem);
-        return newParent;
-      } else {
-        const parentPathElement = this.treeProvider.findDir(nextLevelPerantPath);
-        if (parentPathElement) {
-          const newParent = newGoDirItem(parentPathElement);
-          this.addElement(newParent);
-          await this.initChildren(newParent);
-
-          return newParent;
-        } else {
-          return;
-        }
+      const knownParent = this.elements.get(childId);
+      if (knownParent instanceof GoDirItem) {
+        await this.initChildren(knownParent);
+        return knownParent;
       }
+      const parentPathElement = this.treeProvider.findDir(childId);
+      if (!parentPathElement) {
+        return undefined;
+      }
+      const createdParent = this.addElement(new GoDirItem(parentPathElement));
+      await this.initChildren(createdParent);
+      return createdParent;
     }
   }
 
-  private addElement(element: (GoDirItem | GoFileItem)) {
+  private addElement<T extends (GoDirItem | GoFileItem)>(element: T): T {
     this.elements.set(element?.id!!, element);
     return element;
   }
@@ -363,10 +317,6 @@ export class GoTreeDataProvider implements TreeDataProvider<TreeItem>, Disposabl
     }
   }
 
-  onSelect(element: TreeItem) {
-
-  }
-
   onExpand(element: TreeItem) {
     const id = element.id;
     if (id) {
@@ -380,10 +330,6 @@ export class GoTreeDataProvider implements TreeDataProvider<TreeItem>, Disposabl
       this.expanded.delete(id);
     }
   }
-}
-
-function newGoDirItem(dir: PathElement, label: string | undefined = undefined) {
-  return new GoDirItem(dir, label);
 }
 
 export class GoDirItem extends TreeItem {

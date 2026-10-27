@@ -73,6 +73,16 @@
         "title": "Copy Path"
       },
       {
+        "command": "go.dependencies.copy.import.path",
+        "title": "Copy Import Path",
+        "category": "Explorer"
+      },
+      {
+        "command": "go.dependencies.open.on.pkg.go.dev",
+        "title": "Open on pkg.go.dev",
+        "category": "Explorer"
+      },
+      {
         "command": "go.dependencies.open.in.integrated.terminal",
         "title": "Open in Integrated Terminal"
       },
@@ -114,6 +124,14 @@
         {
           "when": "view == 'go.dependencies.explorer'",
           "command": "go.dependencies.copy.path"
+        },
+        {
+          "when": "view == 'go.dependencies.explorer' && viewItem == goDir",
+          "command": "go.dependencies.copy.import.path"
+        },
+        {
+          "when": "view == 'go.dependencies.explorer' && viewItem == goDir",
+          "command": "go.dependencies.open.on.pkg.go.dev"
         },
         {
           "when": "view == 'go.dependencies.explorer' && viewItem == goDir",

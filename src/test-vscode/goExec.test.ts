@@ -18,7 +18,7 @@ suite('GoExec Test Suite', () => {
       throw new Error('GoExtensionAPI not found');
     } else {
       goExec = new GoExec(getGoBinPath(goExtensionApi));
-      goEnv = goExec.getEnv();
+      goEnv = await goExec.getEnv();
     }
   });
 

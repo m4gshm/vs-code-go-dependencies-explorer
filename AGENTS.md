@@ -9,6 +9,8 @@ browsing Go package resources: the standard library (`GOROOT/src`), external
 module packages (`GOMODCACHE` via `go list -m all`) and replaced modules.
 It depends on the `golang.go` extension (source of the `go` binary path) and
 `vscode.git` (guard against accidentally opening dependency dirs as repos).
+`goExec` runs `go` asynchronously (`execFile`); full rescans are still
+expensive, so keep them rare and debounced.
 
 ## Commands
 
@@ -49,7 +51,7 @@ GoTreeDataProvider → tree view`.
 | Module | Responsibility |
 | --- | --- |
 | `extension.ts` | Activation (waits for `golang.go` via `extensions.onDidChange`), command registration, git-repo guard |
-| `goExec.ts` | Sync subprocess wrapper over `go env -json` / `go list` (env result is cached per instance) |
+| `goExec.ts` | Async subprocess wrapper over `go env -json` / `go list` (env result is cached per instance) |
 | `goDirs.ts` | `GOROOT/src` and `GOMODCACHE` resolution from go env |
 | `goPackageProvider.ts` | Walks std-lib and module dirs, builds `PathTree`s, fires `onRequestPackages` |
 | `goDependenciesStateProvider.ts` | Holds the three root trees (StdLib / Modules / ModulesReplaced), computes added/removed dir diffs on `refresh(calcChanges)` |
@@ -69,8 +71,8 @@ When changing behavior, update `README.md` and the setting descriptions in
 - Dependency files opened from the tree are set read-only for the session;
   paths are normalized with `normalizeWinPath` (lower-cased drive letter) —
   never compare raw `fsPath` strings with go-env paths directly.
-- `goExec` calls are synchronous (`spawnSync`): keep refresh rare and cheap;
-  `getEnv` is cached, reuse it instead of spawning again.
+- `goExec` calls are asynchronous but full rescans are expensive; keep refresh
+  rare and debounced; `getEnv` is cached, reuse it instead of spawning again.
 
 ## Conventions
 

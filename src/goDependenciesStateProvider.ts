@@ -26,55 +26,54 @@ export class GoDependenciesStateProvider {
         return this._stdLibDirs.get(path) || this._moduleDirs.get(path) || this._replacedDirs.get(path);
     }
 
-    async refresh(calcChanges: boolean = false) {
+    async refresh(calcChanges: boolean = false): Promise<RemovedAddedDirs | undefined> {
         const [std, modules] = await this.packageProvider.getPackages();
 
-        const newStdLibRootDir = std.root.with({ name: 'Standard Library' });;
+        const oldStdLibDirs = this.swapTree(this._stdLibDirs, dirs => this._stdLibDirs = dirs,
+            std.root.with({ name: 'Standard Library' }), root => this._stdLibRootDir = root);
 
-        this._stdLibRootDir = newStdLibRootDir;
-        const oldStdLibDirs = this._stdLibDirs;
+        const oldModuleDirs = this.swapTree(this._moduleDirs, dirs => this._moduleDirs = dirs,
+            modules.root?.with({ name: 'External Packages' }), root => this._modulesRootDir = root);
 
-        const newStdLibDirs = flat([newStdLibRootDir]);
-        this._stdLibDirs = newStdLibDirs;
-
-        const root = modules.root;
-        const newModulesRootDir = root?.with({ name: 'External Packages' }); //? newGoDirItem(root, 'External Packages') : undefined;
-
-        this._modulesRootDir = newModulesRootDir;
-
-        const oldModuleDirs = this._moduleDirs;
-        const newModuleDirs = flat(newModulesRootDir ? [newModulesRootDir] : []);
-
-        this._moduleDirs = newModuleDirs;
-
-        let newReplacedRootDir: PathElement | undefined = undefined;
         const rootReplaced = modules.rootReplaced;
-        if (rootReplaced) {
-            const rootReplacedName = rootReplaced.name;
-            const rootReplacedLabel = "..." + parse(rootReplacedName).name;
-            newReplacedRootDir = rootReplaced?.with({ name: rootReplacedLabel });// ? newGoDirItem(rootReplaced, rootReplacedLabel) : undefined;
+        const replacedRootDir = rootReplaced
+            ? rootReplaced.with({ name: '...' + parse(rootReplaced.name).name })
+            : undefined;
+        const oldReplacedDirs = this.swapTree(this._replacedDirs, dirs => this._replacedDirs = dirs,
+            replacedRootDir, root => this._replacedRootDir = root);
+
+        if (!calcChanges) {
+            return undefined;
         }
-        this._replacedRootDir = newReplacedRootDir;
-
-        const oldReplaced = this._replacedDirs;
-        const newReplaced = flat(newReplacedRootDir ? [newReplacedRootDir] : []);
-        this._replacedDirs = newReplaced;
-
-        if (calcChanges) {
-            const removedStdDirs = getRemoved(oldStdLibDirs, newStdLibDirs);
-            const addedStdDirs = getAdded(oldStdLibDirs, newStdLibDirs);
-            const removedModuleDirs = getRemoved(oldModuleDirs, newModuleDirs);
-            const addedModuleDir = getAdded(oldModuleDirs, newModuleDirs);
-
-            const removedReplaced = getRemoved(oldReplaced, newReplaced);
-            const addedReplaced = getAdded(oldReplaced, newReplaced);
-
-            return {
-                removedStdDirs, addedStdDirs, removedModuleDirs, addedModuleDir, removedReplaced, addedReplaced
-            };
-        }
-        return undefined;
+        return {
+            removedStdDirs: getRemoved(oldStdLibDirs, this._stdLibDirs),
+            addedStdDirs: getAdded(oldStdLibDirs, this._stdLibDirs),
+            removedModuleDirs: getRemoved(oldModuleDirs, this._moduleDirs),
+            addedModuleDir: getAdded(oldModuleDirs, this._moduleDirs),
+            removedReplaced: getRemoved(oldReplacedDirs, this._replacedDirs),
+            addedReplaced: getAdded(oldReplacedDirs, this._replacedDirs),
+        };
     }
+
+    private swapTree<R extends PathElement | undefined>(
+        oldDirs: Map<string, PathElement>,
+        setDirs: (dirs: Map<string, PathElement>) => void,
+        root: R,
+        setRoot: (root: R) => void,
+    ) {
+        setRoot(root);
+        setDirs(flat(root ? [root] : []));
+        return oldDirs;
+    }
+}
+
+export interface RemovedAddedDirs {
+    removedStdDirs: PathElement[];
+    addedStdDirs: PathElement[];
+    removedModuleDirs: PathElement[];
+    addedModuleDir: PathElement[];
+    removedReplaced: PathElement[];
+    addedReplaced: PathElement[];
 }
 
 function getRemoved<T>(oldDirs: Map<string, T>, newDirs: Map<string, T>) {

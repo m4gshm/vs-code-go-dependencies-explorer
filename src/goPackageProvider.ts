@@ -6,7 +6,6 @@ import { getModulesPath, getStdLibPath, getGoPackagePaths } from './goDirs';
 import { PathElement, PathTreeBuilder, normalizeWinPath } from './pathTree';
 
 export const GO_MOD_PATTERN = '**/go.mod';
-export const GO_SUM_PATTERN = '**/go.sum';
 
 export class GoPackageProvider implements Disposable {
     constructor(private readonly goExec: GoExec) { }
