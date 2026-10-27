@@ -9,7 +9,8 @@ A VS Code extension that adds an explorer view for browsing the Go standard libr
 ## Features
 
 - **Standard Library** — browse packages and files of the Go standard library (`GOROOT/src`).
-- **External Packages** — browse packages of all modules used in the workspace (`go list -m all` + `GOMODCACHE`), with replaced modules shown on a separate root.
+- **External Packages** — browse packages of all modules used in the workspace (`go list -m all` + `GOMODCACHE`), with replaced modules shown on a separate root and module versions shown next to the package nodes.
+- **Go to Package** — quick pick any dependency package by name or path and reveal it in the tree.
 - **Editor sync** — opening a dependency file reveals it in the tree and marks it read-only for the session, so you do not accidentally edit a dependency.
 - **Live refresh** — the view updates automatically when `go.mod`/`go.sum` change or workspace folders are added/removed (events are debounced into a single rescan).
 - **Progress** — rescans show progress on the view itself.
@@ -27,6 +28,7 @@ A VS Code extension that adds an explorer view for browsing the Go standard libr
 | Command | Description |
 | --- | --- |
 | `Go Dependencies: Refresh` | Rescan the standard library and module packages |
+| `Go Dependencies: Go to Package` | Quick pick a package and reveal it in the tree (view title) |
 | `Go Dependencies: Search in Dependencies` | Full-text search across all dependency directories |
 | `Go Dependencies: Search in Directory` | Full-text search in the selected directory (context menu) |
 | `Go Dependencies: Copy Path` | Copy the item's file path |

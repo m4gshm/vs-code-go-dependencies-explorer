@@ -9,6 +9,7 @@ import {
 } from 'vscode';
 import { GoDependenciesStateProvider } from './goDependenciesStateProvider';
 import { PathElement } from './pathTree';
+import { TreeState } from './treeState';
 
 export async function createTreeView(ctx: ExtensionContext, treeProvider: GoDependenciesStateProvider) {
   const subscriptions = ctx.subscriptions;
@@ -154,11 +155,7 @@ export class GoTreeDataProvider implements TreeDataProvider<TreeItem>, Disposabl
   readonly onDidChangeTreeData: Event<TreeItem | undefined> = this._onDidChangeTreeData.event;
   private readonly subscriptions: Disposable[] = [];
 
-  private readonly elements = new Map<string, TreeItem>();
-  private readonly children = new Map<string, Set<string>>();
-  private readonly parents = new Map<string, string>();
-
-  private readonly expanded = new Set<string>();
+  private readonly state = new TreeState<TreeItem>();
 
   constructor(private readonly treeProvider: GoDependenciesStateProvider) {
     this.subscriptions.push(this._onDidChangeTreeData);
@@ -170,36 +167,16 @@ export class GoTreeDataProvider implements TreeDataProvider<TreeItem>, Disposabl
 
   async refresh(force = false) {
     if (force) {
-      this.elements.clear();
-      this.children.clear();
-      this.parents.clear();
-      this.expanded.clear();
+      this.state.clear();
     } else {
       const changes = await this.treeProvider.refresh(true);
       if (changes) {
-        changes.removedStdDirs?.forEach(d => this.deleteState(d.path));
-        changes.removedModuleDirs?.forEach(d => this.deleteState(d.path));
-        changes.removedReplaced?.forEach(d => this.deleteState(d.path));
+        changes.removedStdDirs?.forEach(d => this.state.deleteDeep(d.path));
+        changes.removedModuleDirs?.forEach(d => this.state.deleteDeep(d.path));
+        changes.removedReplaced?.forEach(d => this.state.deleteDeep(d.path));
       }
     }
     this._onDidChangeTreeData.fire(undefined);
-  }
-
-  private deleteState(id: string) {
-    const element = this.elements.get(id);
-    if (!element) {
-      return;
-    }
-    const children = this.children.get(id) || new Set();
-    for (const childId of children) {
-      if (childId) {
-        this.deleteState(childId);
-      }
-    }
-    this.elements.delete(id);
-    this.children.delete(id);
-    this.parents.delete(id);
-    this.expanded.delete(id);
   }
 
   async getTreeItem(element: TreeItem) {
@@ -208,40 +185,43 @@ export class GoTreeDataProvider implements TreeDataProvider<TreeItem>, Disposabl
       return element;
     }
 
-    const found = this.elements.get(id);
+    const found = this.state.element(id);
     if (found) {
       element = found;
     } else if (element instanceof GoDirItem || element instanceof GoFileItem) {
-      this.addElement(element);
+      this.state.add(element);
     }
 
     if (element instanceof GoDirItem) {
-      if (!this.expanded.has(id) && element.collapsibleState === TreeItemCollapsibleState.Expanded) {
-        this.expanded.add(id);
+      if (!this.state.isExpanded(id) && element.collapsibleState === TreeItemCollapsibleState.Expanded) {
+        this.state.onExpand(id);
       }
-      element.collapsibleState = this.expanded.has(id)
+      element.collapsibleState = this.state.isExpanded(id)
         ? TreeItemCollapsibleState.Expanded
         : TreeItemCollapsibleState.Collapsed;
+      element.description = this.treeProvider.versionOf(id);
     }
     return element;
   }
 
   async getChildren(element?: TreeItem): Promise<TreeItem[]> {
     const id = element?.id;
-    let childIds = id ? this.children.get(id) : undefined;
-    if (childIds) {
-      const children = Array.from(childIds).map(id => this.elements.get(id)).filter(e => e !== undefined);
-      return children;
-    } else if (element instanceof GoDirItem) {
-      const children = await this.initChildren(element);
-      return children;
-    } else {
-      const rootElements = !element ? Array.from(this.treeProvider.rootDirs.map(d => {
-        const element = this.elements.get(d.path);
-        return element && element instanceof GoDirItem ? element : this.addElement(new GoDirItem(d));
-      })) : [];
-      return rootElements;
+    if (id) {
+      const cached = this.state.childrenOf(id);
+      if (cached) {
+        return cached;
+      }
     }
+    if (element instanceof GoDirItem) {
+      return await this.initChildren(element);
+    }
+    if (element) {
+      return [];
+    }
+    return this.treeProvider.rootDirs.map(d => {
+      const element = this.state.element(d.path);
+      return element && element instanceof GoDirItem ? element : this.state.add(new GoDirItem(d));
+    });
   }
 
   private async initChildren(element: GoDirItem) {
@@ -257,8 +237,7 @@ export class GoTreeDataProvider implements TreeDataProvider<TreeItem>, Disposabl
     const subdirs = dir.children.map(d => new GoDirItem(d));
     const children = [...subdirs, ...files];
 
-    this.linkElements(element, children);
-    children.forEach(child => this.addElement(child));
+    this.state.linkChildren(element.id!!, children);
 
     return children;
   }
@@ -269,8 +248,7 @@ export class GoTreeDataProvider implements TreeDataProvider<TreeItem>, Disposabl
       return undefined;
     }
     while (true) {
-      const parentId = this.parents.get(childId);
-      const parent = parentId ? this.elements.get(parentId) : undefined;
+      const parent = this.state.parentOf(childId);
       if (parent) {
         return parent;
       }
@@ -282,7 +260,7 @@ export class GoTreeDataProvider implements TreeDataProvider<TreeItem>, Disposabl
       }
       childId = parsed.dir;
 
-      const knownParent = this.elements.get(childId);
+      const knownParent = this.state.element(childId);
       if (knownParent instanceof GoDirItem) {
         await this.initChildren(knownParent);
         return knownParent;
@@ -291,44 +269,19 @@ export class GoTreeDataProvider implements TreeDataProvider<TreeItem>, Disposabl
       if (!parentPathElement) {
         return undefined;
       }
-      const createdParent = this.addElement(new GoDirItem(parentPathElement));
+      const createdParent = new GoDirItem(parentPathElement);
+      this.state.add(createdParent);
       await this.initChildren(createdParent);
       return createdParent;
     }
   }
 
-  private addElement<T extends (GoDirItem | GoFileItem)>(element: T): T {
-    this.elements.set(element?.id!!, element);
-    return element;
-  }
-
-  private linkElements(parent: GoDirItem, children: (GoDirItem | GoFileItem)[]) {
-    for (const child of children) {
-      const childId = child.id!!;
-      const parentId = parent.id!!;
-      let children = this.children.get(parentId);
-      if (!children) {
-        children = new Set();
-        this.children.set(parentId, children);
-      }
-      children.add(childId);
-      this.parents.set(childId, parentId);
-      this.addElement(child);
-    }
-  }
-
   onExpand(element: TreeItem) {
-    const id = element.id;
-    if (id) {
-      this.expanded.add(id);
-    }
+    this.state.onExpand(element.id);
   }
 
   onCollapse(element: TreeItem) {
-    const id = element.id;
-    if (id) {
-      this.expanded.delete(id);
-    }
+    this.state.onCollapse(element.id);
   }
 }
 

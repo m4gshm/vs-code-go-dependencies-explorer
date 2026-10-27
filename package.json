@@ -69,6 +69,13 @@
         "icon": "$(search)"
       },
       {
+        "command": "go.dependencies.go.to.package",
+        "title": "Go to Package",
+        "description": "Quick pick a dependency package and reveal it in the tree",
+        "category": "Explorer",
+        "icon": "$(go-to-file)"
+      },
+      {
         "command": "go.dependencies.copy.path",
         "title": "Copy Path"
       },
@@ -116,6 +123,11 @@
         },
         {
           "command": "go.dependencies.search.in.all.directories",
+          "when": "view == go.dependencies.explorer",
+          "group": "navigation"
+        },
+        {
+          "command": "go.dependencies.go.to.package",
           "when": "view == go.dependencies.explorer",
           "group": "navigation"
         }

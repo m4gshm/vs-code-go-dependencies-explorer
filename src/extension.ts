@@ -1,5 +1,5 @@
 import {
-    commands, env, extensions, ExtensionContext, Uri, window, workspace,
+    commands, env, extensions, ExtensionContext, QuickPickItem, TreeItem, TreeView, Uri, window, workspace,
 } from 'vscode';
 import { createTreeView, getFsUriOfSelectedItem, GoDirItem } from "./treeView";
 import { GoExec } from './goExec';
@@ -43,9 +43,9 @@ async function activateWithGo(context: ExtensionContext, goExtensionApi: GoExten
         const goPackDirProvider = new GoPackageProvider(goExec);
         const treeProvider = await GoDependenciesStateProvider.new(goPackDirProvider);
 
-        const { refresh } = await createTreeView(context, treeProvider);
+        const { treeView, refresh } = await createTreeView(context, treeProvider);
 
-        registerCommands(context, goExec, treeProvider, refresh);
+        registerCommands(context, goExec, treeProvider, treeView, refresh);
 
         console.log('Go Dependencies Explorer activated');
         await commands.executeCommand('setContext', 'go.dependencies.explorer.show', true);
@@ -94,7 +94,7 @@ async function registerGitRepoGuard(context: ExtensionContext, goExec: GoExec) {
     }));
 }
 
-function registerCommands(context: ExtensionContext, goExec: GoExec, treeProvider: GoDependenciesStateProvider, refresh: (force?: boolean) => Promise<void>) {
+function registerCommands(context: ExtensionContext, goExec: GoExec, treeProvider: GoDependenciesStateProvider, treeView: TreeView<TreeItem>, refresh: (force?: boolean) => Promise<void>) {
     const subscriptions = context.subscriptions;
 
     const searchIn = async (filesToInclude: string) => {
@@ -106,8 +106,24 @@ function registerCommands(context: ExtensionContext, goExec: GoExec, treeProvide
 
     const getModulesPath = async () => (await getGoPackagePaths(goExec)).modulePath;
 
+    const goToPackage = async () => {
+        const items: (QuickPickItem & { path: string })[] = treeProvider.dirs.map(dir => ({
+            label: dir.name,
+            description: dir.path,
+            path: dir.path,
+        }));
+        const picked = await window.showQuickPick(items, {
+            placeHolder: 'Go to package…',
+            matchOnDescription: true,
+        });
+        if (picked) {
+            await treeView.reveal({ id: picked.path }, { select: true, focus: false });
+        }
+    };
+
     subscriptions.push(
         commands.registerCommand('go.dependencies.refresh', async () => await refresh(true)),
+        commands.registerCommand('go.dependencies.go.to.package', goToPackage),
         commands.registerCommand('go.dependencies.search.in.all.directories', async _ => {
             const dirs = treeProvider.rootDirs
                 .map(dir => getFsUriOfSelectedItem(dir))

@@ -11,6 +11,7 @@ interface FakeModule {
     dir: string;
     path: string;
     replaced: boolean;
+    version?: string;
 }
 
 function stdLib(rootDir: string, pkgDirs: string[]): GoStdLibTree {
@@ -23,7 +24,10 @@ function modules(ofDirs: FakeModule[], replacedDirs: FakeModule[]): GoModuleTree
     const replaced = replacedDirs.map(m => m.dir);
     const root = PathTreeBuilder.create(dirs)?.toDirectory();
     const rootReplaced = PathTreeBuilder.create(replaced)?.toDirectory();
-    return { root, rootReplaced };
+    const versions = new Map(ofDirs.concat(replacedDirs)
+        .filter(m => m.version !== undefined)
+        .map(m => [normalize(m.dir), m.version as string]));
+    return { root, rootReplaced, versions };
 }
 
 class FakePackageProvider {
@@ -64,7 +68,7 @@ suite('GoDependenciesStateProvider unit', () => {
     test('rootDirs omits missing external modules root', async () => {
         const p = await provider(
             () => stdLib(normalize('/root'), [normalize('/root/pkg/app')]),
-            () => ({ root: undefined, rootReplaced: undefined }),
+            () => ({ root: undefined, rootReplaced: undefined, versions: new Map() }),
         );
 
         assert.deepStrictEqual(p.rootDirs.map((d: PathElement) => d.name), ['Standard Library']);
@@ -114,6 +118,34 @@ suite('GoDependenciesStateProvider unit', () => {
         assert.strictEqual(changes, undefined);
         assert.ok(p.findDir(normalize('/mod/other')));
         assert.strictEqual(p.findDir(normalize('/mod/new')), undefined);
+    });
+    test('versionOf resolves module version for module root and its top-level packages', async () => {
+        const p = await provider(
+            () => stdLib(normalize('/root'), [normalize('/root/pkg/app')]),
+            () => modules([{ dir: normalize('/mod/lib'), path: 'lib', replaced: false, version: 'v1.2.3' }], []),
+        );
+
+        assert.strictEqual(p.versionOf(normalize('/mod/lib')), 'v1.2.3');
+        assert.strictEqual(p.versionOf(normalize('/mod/lib/sub')), 'v1.2.3', 'top-level package of a module without root package inherits the version');
+        assert.strictEqual(p.versionOf(normalize('/mod/lib/sub/deep')), undefined, 'deep packages do not show the version');
+        assert.strictEqual(p.versionOf(normalize('/root')), undefined);
+    });
+
+    test('dirs lists all known directories of every root', async () => {
+        const p = await provider(
+            () => stdLib(normalize('/root'), [normalize('/root/pkg/app')]),
+            () => modules([{ dir: normalize('/mod/lib'), path: 'lib', replaced: false }],
+                [{ dir: normalize('/mod/replaced'), path: 'r', replaced: true }]),
+        );
+
+        const paths = p.dirs.map((d: PathElement) => d.path).sort();
+        assert.deepStrictEqual(paths, [
+            normalize('/mod/lib'),
+            normalize('/mod/replaced'),
+            normalize('/root'),
+            normalize('/root/pkg'),
+            normalize('/root/pkg/app'),
+        ].sort());
     });
 
 });

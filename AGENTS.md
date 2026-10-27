@@ -51,11 +51,13 @@ GoTreeDataProvider → tree view`.
 | Module | Responsibility |
 | --- | --- |
 | `extension.ts` | Activation (waits for `golang.go` via `extensions.onDidChange`), command registration, git-repo guard |
+| `goModulePath.ts` | Pure helpers deriving Go module / import paths from a dir under `GOMODCACHE` |
 | `goExec.ts` | Async subprocess wrapper over `go env -json` / `go list` (env result is cached per instance) |
 | `goDirs.ts` | `GOROOT/src` and `GOMODCACHE` resolution from go env |
 | `goPackageProvider.ts` | Walks std-lib and module dirs, builds `PathTree`s, fires `onRequestPackages` |
 | `goDependenciesStateProvider.ts` | Holds the three root trees (StdLib / Modules / ModulesReplaced), computes added/removed dir diffs on `refresh(calcChanges)` |
 | `pathTree.ts` | Path-tree building, subtree collapsing, win-drive normalization; fully unit-covered |
+| `treeState.ts` | vscode-free cache of tree elements/children/parents/expand-state; unit-covered |
 | `treeView.ts` | `GoTreeDataProvider` + view wiring: selection ↔ active editor sync, read-only marking of dependency files, `go.mod`/`go.sum` watchers |
 | `gitExtension.ts`, `goExtension.ts` | Minimal API typings for the extension dependencies |
 
