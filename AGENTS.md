@@ -75,6 +75,10 @@ When changing behavior, update `README.md` and the setting descriptions in
   never compare raw `fsPath` strings with go-env paths directly.
 - `goExec` calls are asynchronous but full rescans are expensive; keep refresh
   rare and debounced; `getEnv` is cached, reuse it instead of spawning again.
+- Scans of std-lib and `GOMODCACHE` dirs are cached per session (`DirScanCache`
+  in `GoPackageProvider`) — those trees are immutable; replaced/local dirs are
+  never cached. `refresh(force=true)` bypasses and clears the cache, watcher
+  and workspace refreshes use it.
 
 ## Conventions
 

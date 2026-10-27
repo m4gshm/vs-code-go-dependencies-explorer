@@ -13,6 +13,7 @@ A VS Code extension that adds an explorer view for browsing the Go standard libr
 - **Go to Package** — quick pick any dependency package by name or path and reveal it in the tree.
 - **Editor sync** — opening a dependency file reveals it in the tree and marks it read-only for the session, so you do not accidentally edit a dependency.
 - **Live refresh** — the view updates automatically when `go.mod`/`go.sum` change or workspace folders are added/removed (events are debounced into a single rescan).
+- **Scan cache** — package directory scans of the standard library and `GOMODCACHE` modules are cached per session; those trees are immutable (module versions live in directory names), so incremental refreshes rescan only replaced/local dirs. The `Refresh` command always performs a full rescan and resets the cache.
 - **Progress** — rescans show progress on the view itself.
 - **Git guard** — a git repository accidentally opened inside package directories can be closed automatically.
 - **Non-blocking** — `go` commands and directory scans run asynchronously, the extension host is never frozen.

@@ -4,11 +4,12 @@ import { EventEmitter, workspace, Disposable } from 'vscode';
 import { GoExec } from './goExec';
 import { getModulesPath, getStdLibPath, getGoPackagePaths } from './goDirs';
 import { PathElement, PathTreeBuilder, normalizeWinPath } from './pathTree';
+import { DirScanCache } from './dirScanCache';
 
 export const GO_MOD_PATTERN = '**/go.mod';
 
 export class GoPackageProvider implements Disposable {
-    constructor(private readonly goExec: GoExec) { }
+    constructor(private readonly goExec: GoExec, private readonly scanCache: DirScanCache = new DirScanCache()) { }
 
     private readonly _onRequestPackages = new EventEmitter<[GoStdLibTree, GoModuleTree]>();
     readonly onRequestPackages = this._onRequestPackages.event;
@@ -17,8 +18,11 @@ export class GoPackageProvider implements Disposable {
         return await getGoPackagePaths(this.goExec);
     }
 
-    async getPackages() {
-        const dirs = await getGoPackages(this.goExec);
+    async getPackages(useCache: boolean = true) {
+        if (!useCache) {
+            this.scanCache.clear();
+        }
+        const dirs = await getGoPackages(this.goExec, this.scanCache);
         this._onRequestPackages.fire(dirs);
         return dirs;
     }
@@ -38,8 +42,19 @@ export interface GoModuleTree {
     versions: Map<string, string>;
 }
 
-async function getGoPackages(goExec: GoExec): Promise<[GoStdLibTree, GoModuleTree]> {
-    const getPackageDirs = async (dir: string) => Array.from(new Set(await listGoPackageDirs(dir)));
+async function getGoPackages(goExec: GoExec, scanCache: DirScanCache): Promise<[GoStdLibTree, GoModuleTree]> {
+    const listPackageDirs = async (dir: string, cacheable: boolean) => {
+        if (!cacheable) {
+            return Array.from(new Set(await listGoPackageDirs(dir)));
+        }
+        const cached = scanCache.get(dir);
+        if (cached) {
+            return cached;
+        }
+        const dirs = Array.from(new Set(await listGoPackageDirs(dir)));
+        scanCache.set(dir, dirs);
+        return dirs;
+    };
 
     const getGoStdLibDirs = async () => {
         const env = await goExec.getEnv();
@@ -47,7 +62,7 @@ async function getGoPackages(goExec: GoExec): Promise<[GoStdLibTree, GoModuleTre
 
         console.debug(`retrieving Go package for standard library ${stdLibPath}`);
 
-        const stdGoPackageDirs = await getPackageDirs(stdLibPath);
+        const stdGoPackageDirs = await listPackageDirs(stdLibPath, true);
         const root = PathTreeBuilder.create(stdGoPackageDirs, stdLibPath)!!.toDirectory();
         return { root };
     };
@@ -98,11 +113,11 @@ async function getGoPackages(goExec: GoExec): Promise<[GoStdLibTree, GoModuleTre
 
         const modulePath = Array.from(moduleDirsSet);
         console.debug(`retrieving Go package dirs for module dirs ${modulePath}`);
-        const modulePackageDirs = (await Promise.all(modulePath.map(d => getPackageDirs(d)))).flatMap(dd => dd);
+        const modulePackageDirs = (await Promise.all(modulePath.map(d => listPackageDirs(d, d.startsWith(extPackagesDir))))).flatMap(dd => dd);
 
         const replacedDirs = Array.from(replacedDirsSet);
         console.debug(`retrieving Go replaced package dirs for module dirs ${replacedDirs}`);
-        const replacedPackageDirs = (await Promise.all(replacedDirs.map(d => getPackageDirs(d)))).flatMap(dd => dd);
+        const replacedPackageDirs = (await Promise.all(replacedDirs.map(d => listPackageDirs(d, d.startsWith(extPackagesDir))))).flatMap(dd => dd);
 
         const root = PathTreeBuilder.create(modulePackageDirs, extPackagesDir)?.toDirectory();
         const rootReplaced = PathTreeBuilder.create(replacedPackageDirs)?.toDirectory();

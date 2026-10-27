@@ -40,8 +40,8 @@ export class GoDependenciesStateProvider {
         return parent ? this._moduleVersions.get(parent) : undefined;
     }
 
-    async refresh(calcChanges: boolean = false): Promise<RemovedAddedDirs | undefined> {
-        const [std, modules] = await this.packageProvider.getPackages();
+    async refresh(calcChanges: boolean = false, useCache: boolean = true): Promise<RemovedAddedDirs | undefined> {
+        const [std, modules] = await this.packageProvider.getPackages(useCache);
         this._moduleVersions = modules.versions;
 
         const oldStdLibDirs = this.swapTree(this._stdLibDirs, dirs => this._stdLibDirs = dirs,

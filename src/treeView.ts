@@ -168,13 +168,12 @@ export class GoTreeDataProvider implements TreeDataProvider<TreeItem>, Disposabl
   async refresh(force = false) {
     if (force) {
       this.state.clear();
-    } else {
-      const changes = await this.treeProvider.refresh(true);
-      if (changes) {
-        changes.removedStdDirs?.forEach(d => this.state.deleteDeep(d.path));
-        changes.removedModuleDirs?.forEach(d => this.state.deleteDeep(d.path));
-        changes.removedReplaced?.forEach(d => this.state.deleteDeep(d.path));
-      }
+    }
+    const changes = await this.treeProvider.refresh(!force, !force);
+    if (!force && changes) {
+      changes.removedStdDirs?.forEach(d => this.state.deleteDeep(d.path));
+      changes.removedModuleDirs?.forEach(d => this.state.deleteDeep(d.path));
+      changes.removedReplaced?.forEach(d => this.state.deleteDeep(d.path));
     }
     this._onDidChangeTreeData.fire(undefined);
   }
