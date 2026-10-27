@@ -1,11 +1,13 @@
 {
   "name": "vs-code-go-dependencies-explorer",
-  "icon": "icon.png",
-  "type": "commonjs",
-  "publisher": "m4gshm",
   "displayName": "Go dependencies explorer",
   "description": "File explorer for quickly accessing Go package resources such as .go files and so on.",
   "version": "0.0.6",
+  "publisher": "m4gshm",
+  "license": "MIT",
+  "icon": "icon.png",
+  "type": "commonjs",
+  "main": "./dist/extension.js",
   "engines": {
     "vscode": "^1.112.0"
   },
@@ -21,7 +23,10 @@
     "golang.go",
     "vscode.git"
   ],
-  "main": "./dist/extension.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/m4gshm/vs-code-go-dependencies-explorer.git"
+  },
   "contributes": {
     "configuration": {
       "title": "Go Dependencies Explorer",
@@ -35,6 +40,21 @@
           ],
           "default": "ask",
           "description": "Prevent opening git repositories by opening files from \"Standard Library\" or \"External Packages\"."
+        },
+        "go.dependencies.explorer.use.scan.cache": {
+          "type": "boolean",
+          "default": true,
+          "description": "Cache package directory scans of the standard library and GOMODCACHE modules between refreshes. Disable to perform a full rescan on every refresh."
+        },
+        "go.dependencies.explorer.check.module.updates": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allow the \"Check for Module Updates\" command to query available module updates. The check requires network access and only runs when triggered manually."
+        },
+        "go.dependencies.explorer.updates.goproxy": {
+          "type": "string",
+          "default": "",
+          "description": "GOPROXY override for the module update check, e.g. a corporate mirror. Accepts any GOPROXY value (module proxy URL, comma-separated fallback list, \"direct\", \"off\"). Empty uses the go toolchain default."
         }
       }
     },
@@ -64,8 +84,32 @@
         "icon": "$(search)"
       },
       {
+        "command": "go.dependencies.go.to.package",
+        "title": "Go to Package",
+        "description": "Quick pick a dependency package and reveal it in the tree",
+        "category": "Explorer",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "go.dependencies.check.module.updates",
+        "title": "Check for Module Updates",
+        "description": "Query available updates for the workspace modules and show them in the tree",
+        "category": "Explorer",
+        "icon": "$(cloud-download)"
+      },
+      {
         "command": "go.dependencies.copy.path",
         "title": "Copy Path"
+      },
+      {
+        "command": "go.dependencies.copy.import.path",
+        "title": "Copy Import Path",
+        "category": "Explorer"
+      },
+      {
+        "command": "go.dependencies.open.on.pkg.go.dev",
+        "title": "Open on pkg.go.dev",
+        "category": "Explorer"
       },
       {
         "command": "go.dependencies.open.in.integrated.terminal",
@@ -103,12 +147,30 @@
           "command": "go.dependencies.search.in.all.directories",
           "when": "view == go.dependencies.explorer",
           "group": "navigation"
+        },
+        {
+          "command": "go.dependencies.go.to.package",
+          "when": "view == go.dependencies.explorer",
+          "group": "navigation"
+        },
+        {
+          "command": "go.dependencies.check.module.updates",
+          "when": "view == go.dependencies.explorer",
+          "group": "navigation"
         }
       ],
       "view/item/context": [
         {
           "when": "view == 'go.dependencies.explorer'",
           "command": "go.dependencies.copy.path"
+        },
+        {
+          "when": "view == 'go.dependencies.explorer' && viewItem == goDir",
+          "command": "go.dependencies.copy.import.path"
+        },
+        {
+          "when": "view == 'go.dependencies.explorer' && viewItem == goDir",
+          "command": "go.dependencies.open.on.pkg.go.dev"
         },
         {
           "when": "view == 'go.dependencies.explorer' && viewItem == goDir",
@@ -138,45 +200,35 @@
     }
   },
   "scripts": {
-    "rimraf": "./node_modules/rimraf/bin.js",
     "clean": "rimraf ./dist ./out",
     "check-types": "tsc --noEmit",
-    "prepackage": "npm run build",
-    "package": "npx vsce ls && npx vsce package",
-    "vscode:prepublish": "npm run clean && npm run build",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
-    "predist": "npm run compile",
-    "dist": "node esbuild.js",
-    "dist-watch": "node esbuild.js --watch",
-    "lint": "eslint src",
-    "test": "node --import tsx --test src/test/**/*.test.ts",
-    "prevscode-test": "npm run dist",
+    "vscode:prepublish": "npm run clean && npm run check-types && npm run lint && npm run compile -- --production",
+    "compile": "node esbuild.js",
+    "compile-tests": "tsc -p tsconfig.test.json",
+    "watch": "node esbuild.js --watch",
+    "unit": "vitest run",
+    "coverage": "vitest run --coverage",
+    "test": "npm run unit && npm run compile && npm run compile-tests && npm run vscode-test",
     "vscode-test": "vscode-test",
-    "build": "npm run clean && npm run vscode-test && npm run test && npm run lint"
+    "lint": "eslint src",
+    "build": "npm run test && npm run lint",
+    "package": "npm run vscode:prepublish && vsce package --no-dependencies"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
-    "@types/node": "^20.19.39",
-    "@types/semver": "^7.7.1",
-    "@types/sinon": "^21.0.1",
+    "@types/node": "^22.20.5",
     "@types/vscode": "^1.112.0",
-    "@types/wu": "^2.1.44",
     "@typescript-eslint/eslint-plugin": "^8.58.0",
     "@typescript-eslint/parser": "^8.58.0",
+    "@vitest/coverage-v8": "^3.2.7",
     "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^2.5.2",
     "@vscode/vsce": "^3.9.1",
     "esbuild": ">=0.28.0",
     "eslint": "^10.2.0",
-    "mocha": "^11.6.0",
+    "mocha": "^11.8.0",
     "rimraf": "^6.1.3",
-    "sinon": "^21.1.2",
-    "tsx": "^4.21.0",
-    "typescript": "^6.0.2"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/m4gshm/vs-code-go-dependencies-explorer.git"
+    "typescript": "^6.0.2",
+    "vitest": "^3.2.7"
   }
 }

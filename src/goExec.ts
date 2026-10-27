@@ -3,10 +3,35 @@ import fs from 'fs';
 import { URL } from 'url';
 import { normalizeWinPath } from './pathTree';
 
+const execFile = promisifyExecFile();
+
+function promisifyExecFile() {
+    return (command: string, args: string[], options: cp.ExecFileOptionsWithStringEncoding) =>
+        new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
+            cp.execFile(command, args, { ...options, maxBuffer: 256 * 1024 * 1024 }, (err, stdout, stderr) => {
+                if (err) {
+                    (err as cp.ExecFileException & { stdout?: string; stderr?: string }).stdout = stdout;
+                    (err as cp.ExecFileException & { stdout?: string; stderr?: string }).stderr = stderr;
+                    reject(err);
+                } else {
+                    resolve({ stdout: stdout as string, stderr: (stderr as string) ?? '' });
+                }
+            });
+        });
+}
+
 export type WorkDir = string | URL | undefined;
+
+export interface GoModule {
+    path: string;
+    dir: string;
+    version: string;
+    replaced: boolean;
+}
 
 export class GoExec {
     private readonly _goPath: string;
+    private _envCache: Record<string, string> | undefined;
     public get goPath(): string {
         return this._goPath;
     }
@@ -15,13 +40,13 @@ export class GoExec {
         this._goPath = goPath;
     }
 
-    public listAllPackageDirs(fileDirs: string[]) {
-        return fileDirs.map(fd => this.listPackageDirs(fd, true)).flatMap(s => s);
+    public async listAllPackageDirs(fileDirs: string[]) {
+        return (await Promise.all(fileDirs.map(fd => this.listPackageDirs(fd, true)))).flatMap(s => s);
     }
 
-    public listPackageDirs(workDir: string | undefined = undefined, excludeWorkDir = true) {
+    public async listPackageDirs(workDir: string | undefined = undefined, excludeWorkDir = true): Promise<string[]> {
         const args = ['list', '-f', '{{.Dir}}', '-e', 'all'];
-        const result = this.execGo(args, workDir, false);
+        const result = await this.execGo(args, workDir, false);
         const stderr = result.stderr;
         if (stderr && 'go: warning: "all" matched no packages' === stderr) {
             return [];
@@ -36,51 +61,90 @@ export class GoExec {
         return dir;
     }
 
-    public getEnv(workDir: WorkDir = undefined) {
-        const cmd = ['env', '-json'];
-        const result = this.execGo(cmd, workDir);
-        const rawJson = JSON.parse(result.stdout);
-        return rawJson;
+    public async getEnv(workDir: WorkDir = undefined): Promise<Record<string, string>> {
+        if (workDir === undefined) {
+            if (!this._envCache) {
+                this._envCache = await this.goEnv(workDir);
+            }
+            return this._envCache;
+        }
+        return await this.goEnv(workDir);
     }
 
-    public getModules(moduleName: string | undefined = undefined, workDir: string) {
+    private async goEnv(workDir: WorkDir = undefined): Promise<Record<string, string>> {
+        const cmd = ['env', '-json'];
+        const result = await this.execGo(cmd, workDir);
+        try {
+            return JSON.parse(result.stdout);
+        } catch (err) {
+            throw new Error(`failed to parse output of 'go ${cmd.join(' ')}': ${(err as Error).message}`);
+        }
+    }
+
+    public async getModules(moduleName: string | undefined = undefined, workDir: string): Promise<GoModule[]> {
         const delim = '=>';
-        const replaced = 'replaced';
-        const args = ['list', '-f', '{{.Path}}' + delim + '{{.Dir}}' + delim + '{{if not (eq .Replace nil)}}' + replaced + '{{end}}', '-m', '-e'];
+        const fields = ['{{.Path}}', '{{.Dir}}', '{{.Version}}', '{{if not (eq .Replace nil)}}replaced{{end}}'];
+        const args = ['list', '-f', fields.join(delim), '-m', '-e'];
         if (moduleName) {
             args.push(moduleName);
         }
-        const result = this.execGo(args, workDir);
-        const modules = result.stdout.split('\n').filter(line => line.length > 0).map(pair => {
-            const parts = pair.split(delim);
-            const path = parts[0];
-            const dir = parts[1];
-            const replaced = parts[2];
-            return { dir: normalizeWinPath(dir), path: path, replaced: replaced === "replaced" };
+        const result = await this.execGo(args, workDir);
+        return result.stdout.split('\n').filter(line => line.length > 0).map(line => {
+            const parts = line.split(delim);
+            const dir = parts.length > 1 ? parts[1] : '';
+            return {
+                path: parts[0],
+                dir: dir ? normalizeWinPath(dir) : '',
+                version: parts.length > 2 ? parts[2] : '',
+                replaced: parts[3] === 'replaced',
+            };
         }).filter(module => module.dir.length > 0);
-        return modules;
     }
 
-    private execGo(args: string[], workDir: WorkDir = undefined, throwStdErr = true) {
-        return this.exec(this.goPath, args, workDir, throwStdErr);
+    public async getModuleUpdates(workDir: string, goproxy: string | undefined = undefined): Promise<Map<string, string>> {
+        const args = ['list', '-m', '-u', '-f', '{{.Dir}}=>{{.Update.Version}}', 'all'];
+        const result = await this.execGo(args, workDir, true, goproxy ? { GOPROXY: goproxy } : undefined);
+        const updates = new Map<string, string>();
+        for (const line of result.stdout.split('\n')) {
+            const delim = line.indexOf('=>');
+            if (!line || delim <= 0) {
+                continue;
+            }
+            const dir = normalizeWinPath(line.slice(0, delim));
+            const version = line.slice(delim + 2);
+            if (dir && version) {
+                updates.set(dir, version);
+            }
+        }
+        return updates;
     }
 
-    private exec(command: string, args: string[], workDir: WorkDir, throwStdErr = true) {
+    private execGo(args: string[], workDir: WorkDir = undefined, throwStdErr = true, extraEnv: Record<string, string> | undefined = undefined) {
+        return this.exec(this.goPath, args, workDir, throwStdErr, extraEnv);
+    }
+
+    private async exec(command: string, args: string[], workDir: WorkDir, throwStdErr = true, extraEnv: Record<string, string> | undefined = undefined): Promise<{ stdout: string; stderr?: string }> {
         if (workDir && !fs.existsSync(workDir)) {
             throw new Error(`The working directory does not exist: ${workDir}`);
         }
-        const result = cp.spawnSync(command, args, { cwd: workDir, encoding: 'utf8' });
-        const err = result.error;
-        if (err) {
-            throw err;
+        const cwd = typeof workDir === 'string' ? workDir : undefined;
+        const env = extraEnv ? { ...process.env, ...extraEnv } : undefined;
+        try {
+            const { stdout, stderr } = await execFile(command, args, { cwd, encoding: 'utf8', env, timeout: 120000 });
+            return this.handleExecResult(stdout, stderr, [command, ...args], throwStdErr);
+        } catch (err) {
+            const execErr = err as cp.ExecFileException & { stdout?: string; stderr?: string };
+            return this.handleExecResult(execErr.stdout ?? '', execErr.stderr ?? '', [command, ...args], throwStdErr);
         }
-        const stderr = result.stderr?.trim();
-        const stdout = result.stdout.trim();
-        if (throwStdErr && stderr.length > 0) {
-            throw this.newError([command, ...args], result.stderr);
-        } else {
-            return !throwStdErr && stderr.length > 0 ? { stdout, stderr } : { stdout };
+    }
+
+    private handleExecResult(stdout: string, stderr: string | undefined, fullArgs: string[], throwStdErr: boolean) {
+        const errOut = (stderr ?? '').trim();
+        const out = stdout.trim();
+        if (throwStdErr && errOut.length > 0) {
+            throw this.newError(fullArgs, errOut);
         }
+        return !throwStdErr && errOut.length > 0 ? { stdout: out, stderr: errOut } : { stdout: out };
     }
 
     private newError(args: string[], err: string) {

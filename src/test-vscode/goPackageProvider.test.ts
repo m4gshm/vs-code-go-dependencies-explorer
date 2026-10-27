@@ -20,15 +20,13 @@ suite('GoPackageProvider Test Suite', () => {
         }
     });
 
-    test('getDependencyDirs returns stdLibPath and modulePath', () => {
-        const dirs = provider!.getPackagePaths();
+    test('getDependencyDirs returns stdLibPath and modulePath', async () => {
+        const dirs = await provider!.getPackagePaths();
         assert.ok(dirs);
 
-        // stdLibPath should be under GOROOT/src
-        const env = goExec!.getEnv();
+        const env = await goExec!.getEnv();
         const expectedStdLibDir = normalizeWinPath(join(`${env['GOROOT']}`, 'src'));
         assert.strictEqual(dirs.stdLibPath, expectedStdLibDir);
-        // modulePath should be GOMODCACHE
         const expectedModuleDirs = normalizeWinPath(`${env['GOMODCACHE']}`);
         assert.strictEqual(dirs.modulePath, expectedModuleDirs);
     });
@@ -46,7 +44,6 @@ suite('GoPackageProvider Test Suite', () => {
             eventFired = true;
             eventData = data;
         });
-        // Trigger event
         await provider!.getPackages();
         assert.strictEqual(eventFired, true);
         assert.ok(eventData);
