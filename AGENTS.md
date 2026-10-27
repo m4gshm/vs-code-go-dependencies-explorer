@@ -58,7 +58,8 @@ GoTreeDataProvider → tree view`.
 | `goDependenciesStateProvider.ts` | Holds the three root trees (StdLib / Modules / ModulesReplaced), computes added/removed dir diffs on `refresh(calcChanges)` |
 | `pathTree.ts` | Path-tree building, subtree collapsing, win-drive normalization; fully unit-covered |
 | `treeState.ts` | vscode-free cache of tree elements/children/parents/expand-state; unit-covered |
-| `treeView.ts` | `GoTreeDataProvider` + view wiring: selection ↔ active editor sync, read-only marking of dependency files, `go.mod`/`go.sum` watchers |
+| `treeModel.ts` | vscode-free tree logic (`GoTreeModel`): nodes, children via injected `readDir`, parent walk, refresh diffs; unit-covered |
+| `treeView.ts` | `GoTreeDataProvider` (thin `ModelNode ↔ TreeItem` adapter) + view wiring: selection ↔ active editor sync, read-only marking of dependency files, `go.mod`/`go.sum` watchers |
 | `gitExtension.ts`, `goExtension.ts` | Minimal API typings for the extension dependencies |
 
 ## Behavioral rules (keep docs in sync!)
