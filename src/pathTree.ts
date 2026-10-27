@@ -70,7 +70,7 @@ export class PathTreeBuilder {
             let newRoot: PathTreeBuilder;
             if (rootDir && dirPathPart === rootDir) {
                 newRoot = new PathTreeBuilder(true, isLeafBranch, dirPathPart, dirPathPart, new Map());
-                dirPathPart = ''; // exit
+                dirPathPart = '';
             } else {
                 const parsed = parse(dirPathPart);
                 const parentParentDir = parsed.dir;

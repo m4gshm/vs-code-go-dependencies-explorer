@@ -119,8 +119,7 @@ async function getGoPackages(goExec: GoExec, scanCache: DirScanCache, updateDirs
             const err = wdm.error;
             if (err) {
                 const message = err instanceof Error ? err.message : `${err}`;
-                const errMessage = `Module error: '${wdm.baseDir}', ${message}`;
-                console.info(errMessage);
+                console.info(`Module error: '${wdm.baseDir}', ${message}`);
             } else {
                 for (const module of wdm.modules) {
                     if (module.replaced) {

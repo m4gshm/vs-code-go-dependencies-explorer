@@ -124,7 +124,7 @@ export async function createTreeView(ctx: ExtensionContext, treeProvider: GoDepe
 
   subscriptions.push(registerGoModWatcher(() => refresh()));
   subscriptions.push(workspace.onDidChangeWorkspaceFolders(event => {
-    console.debug(`handle workspace folders changing, added: ${event.added}, removed: ${event.removed}`);
+    console.debug(`handle workspace folders changing, added: ${event.added.length}, removed: ${event.removed.length}`);
     void refresh();
     syncSelectedFileWithActiveTab();
   }));
