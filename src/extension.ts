@@ -22,14 +22,16 @@ export async function activate(context: ExtensionContext): Promise<any> {
     } else {
         console.log('Waiting for Go extension to activate');
         return subscriptions.push(extensions.onDidChange(async e => {
-            if (!activated && !activating) {
-                const goExtensionApi = await getGoExtensionAPI();
-                if (goExtensionApi && !activated) {
-                    activating = activateWithGo(context, goExtensionApi)
-                        .finally(() => { activating = undefined; });
-                    await activating;
-                }
+            if (activated || activating) {
+                return;
             }
+            const goExtensionApi = await getGoExtensionAPI();
+            if (!goExtensionApi || activated || activating) {
+                return;
+            }
+            activating = activateWithGo(context, goExtensionApi)
+                .finally(() => { activating = undefined; });
+            await activating;
         }));
     }
 }
