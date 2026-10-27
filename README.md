@@ -10,8 +10,10 @@ A VS Code extension that adds an explorer view for browsing the Go standard libr
 
 - **Standard Library** — browse packages and files of the Go standard library (`GOROOT/src`).
 - **External Packages** — browse packages of all modules used in the workspace (`go list -m all` + `GOMODCACHE`), with replaced modules shown on a separate root and module versions shown next to the package nodes.
+- **Module updates** — the `Check for Module Updates` command queries available updates (`go list -m -u all`) and shows them next to the current version (`v1.2.3 → v1.4.0`). Opt-in via `go.dependencies.explorer.check.module.updates`, runs only on manual trigger; a custom `GOPROXY` (e.g. a corporate mirror) can be set with `go.dependencies.explorer.updates.goproxy`.
 - **Go to Package** — quick pick any dependency package by name or path and reveal it in the tree.
 - **Editor sync** — opening a dependency file reveals it in the tree and marks it read-only for the session, so you do not accidentally edit a dependency.
+- **Persistent expand state** — expanded tree nodes are remembered per workspace and restored in the next session.
 - **Live refresh** — the view updates automatically when `go.mod`/`go.sum` change or workspace folders are added/removed (events are debounced into a single rescan).
 - **Scan cache** — package directory scans of the standard library and `GOMODCACHE` modules are cached per session; those trees are immutable (module versions live in directory names), so incremental refreshes rescan only replaced/local dirs. The `Refresh` command always performs a full rescan and resets the cache; the cache can be disabled with `go.dependencies.explorer.use.scan.cache`.
 - **Progress** — rescans show progress on the view itself.
@@ -30,6 +32,7 @@ A VS Code extension that adds an explorer view for browsing the Go standard libr
 | --- | --- |
 | `Go Dependencies: Refresh` | Rescan the standard library and module packages |
 | `Go Dependencies: Go to Package` | Quick pick a package and reveal it in the tree (view title) |
+| `Go Dependencies: Check for Module Updates` | Query available module updates and show them in the tree (view title, opt-in) |
 | `Go Dependencies: Search in Dependencies` | Full-text search across all dependency directories |
 | `Go Dependencies: Search in Directory` | Full-text search in the selected directory (context menu) |
 | `Go Dependencies: Copy Path` | Copy the item's file path |
@@ -45,6 +48,8 @@ A VS Code extension that adds an explorer view for browsing the Go standard libr
 | --- | --- | --- |
 | `go.dependencies.explorer.prevent.open.git.repo` | `ask` | Prevent opening git repositories located under "Standard Library" or "External Packages": `ask` shows a confirmation, `on` closes them silently, `off` disables the guard |
 | `go.dependencies.explorer.use.scan.cache` | `true` | Cache package directory scans of the standard library and `GOMODCACHE` modules between refreshes. Set to `false` to perform a full rescan on every refresh |
+| `go.dependencies.explorer.check.module.updates` | `false` | Allow the "Check for Module Updates" command to query available module updates. Requires network access, runs only when triggered manually |
+| `go.dependencies.explorer.updates.goproxy` | *(empty)* | `GOPROXY` override for the module update check — a corporate mirror URL, a comma-separated fallback list, `direct` or `off`. Empty uses the go toolchain default |
 
 ## Building and testing
 

@@ -9,12 +9,32 @@ import {
 } from 'vscode';
 import { GoDependenciesStateProvider } from './goDependenciesStateProvider';
 import { PathElement } from './pathTree';
-import { GoDirNode, GoFileNode, GoTreeModel, ModelNode, TreeSource } from './treeModel';
+import { GoDirNode, GoFileNode, GoTreeModel, ModelNode, TreeSource, ExpandStateStore } from './treeModel';
+
+const EXPANDED_STATE_KEY = 'go.dependencies.explorer.expanded';
+
+function createExpandStore(ctx: ExtensionContext | undefined): ExpandStateStore | undefined {
+    if (!ctx) {
+        return undefined;
+    }
+    const expandedIds = new Set<string>(ctx.workspaceState.get<string[]>(EXPANDED_STATE_KEY, []));
+    return {
+        isExpanded: id => expandedIds.has(id),
+        setExpanded: (id, expanded) => {
+            if (expanded) {
+                expandedIds.add(id);
+            } else {
+                expandedIds.delete(id);
+            }
+            void ctx.workspaceState.update(EXPANDED_STATE_KEY, Array.from(expandedIds));
+        },
+    };
+}
 
 export async function createTreeView(ctx: ExtensionContext, treeProvider: GoDependenciesStateProvider) {
   const subscriptions = ctx.subscriptions;
 
-  const treeDataProvider = new GoTreeDataProvider(treeProvider);
+  const treeDataProvider = new GoTreeDataProvider(treeProvider, ctx);
   subscriptions.push(treeDataProvider);
   const treeView = window.createTreeView("go.dependencies.explorer", {
     showCollapseAll: true, treeDataProvider: treeDataProvider,
@@ -157,17 +177,18 @@ export class GoTreeDataProvider implements TreeDataProvider<TreeItem>, Disposabl
 
   private readonly model: GoTreeModel;
 
-  constructor(treeProvider: GoDependenciesStateProvider) {
+  constructor(treeProvider: GoDependenciesStateProvider, ctx?: ExtensionContext) {
     const source: TreeSource = {
       rootDirs: () => treeProvider.rootDirs,
       findDir: path => treeProvider.findDir(path),
       versionOf: path => treeProvider.versionOf(path),
+      updateOf: path => treeProvider.updateOf(path),
       refreshTree: (calcChanges, useCache) => treeProvider.refresh(calcChanges, useCache),
     };
     this.model = new GoTreeModel(source, async dirPath => {
       const entries = await workspace.fs.readDirectory(Uri.file(dirPath));
       return entries.map(([name, type]) => ({ name, isDirectory: type === FileType.Directory }));
-    });
+    }, createExpandStore(ctx));
     this.subscriptions.push(this._onDidChangeTreeData);
   }
 

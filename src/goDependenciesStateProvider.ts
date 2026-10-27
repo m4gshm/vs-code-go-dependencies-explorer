@@ -10,6 +10,7 @@ export class GoDependenciesStateProvider {
     private _replacedRootDir!: PathElement | undefined;
     private _replacedDirs: Map<string, PathElement> = new Map();
     private _moduleVersions: Map<string, string> = new Map();
+    private _moduleUpdates: Map<string, string> = new Map();
 
     static async new(packageProvider: GoPackageProvider) {
         const p = new GoDependenciesStateProvider(packageProvider);
@@ -40,9 +41,19 @@ export class GoDependenciesStateProvider {
         return parent ? this._moduleVersions.get(parent) : undefined;
     }
 
+    updateOf(path: string) {
+        const own = this._moduleUpdates.get(path);
+        if (own) {
+            return own;
+        }
+        const parent = parse(path).dir;
+        return parent ? this._moduleUpdates.get(parent) : undefined;
+    }
+
     async refresh(calcChanges: boolean = false, useCache: boolean = true): Promise<RemovedAddedDirs | undefined> {
         const [std, modules] = await this.packageProvider.getPackages(useCache);
         this._moduleVersions = modules.versions;
+        this._moduleUpdates = modules.updates;
 
         const oldStdLibDirs = this.swapTree(this._stdLibDirs, dirs => this._stdLibDirs = dirs,
             std.root.with({ name: 'Standard Library' }), root => this._stdLibRootDir = root);

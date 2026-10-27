@@ -82,6 +82,14 @@ When changing behavior, update `README.md` and the setting descriptions in
   and workspace refreshes use it. The cache can be disabled at runtime with
   the `go.dependencies.explorer.use.scan.cache` setting (checked on every
   refresh in `GoTreeDataProvider.refresh`).
+- Expanded nodes persist per workspace (`workspaceState` via the
+  `ExpandStateStore` hook of `GoTreeModel`); a forced refresh restores them
+  from the store on re-render.
+- Module update check is manual-only (`go.dependencies.check.module.updates`),
+  gated by `go.dependencies.explorer.check.module.updates`; results live in
+  `GoPackageProvider.updateDirs` and reach nodes via
+  `GoDependenciesStateProvider.updateOf` composed into the node description
+  by `GoTreeModel`. Network failures surface a warning, never break the tree.
 
 ## Conventions
 

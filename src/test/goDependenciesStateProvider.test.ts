@@ -27,7 +27,7 @@ function modules(ofDirs: FakeModule[], replacedDirs: FakeModule[]): GoModuleTree
     const versions = new Map(ofDirs.concat(replacedDirs)
         .filter(m => m.version !== undefined)
         .map(m => [normalize(m.dir), m.version as string]));
-    return { root, rootReplaced, versions };
+    return { root, rootReplaced, versions, updates: new Map() };
 }
 
 class FakePackageProvider {
@@ -68,7 +68,7 @@ suite('GoDependenciesStateProvider unit', () => {
     test('rootDirs omits missing external modules root', async () => {
         const p = await provider(
             () => stdLib(normalize('/root'), [normalize('/root/pkg/app')]),
-            () => ({ root: undefined, rootReplaced: undefined, versions: new Map() }),
+            () => ({ root: undefined, rootReplaced: undefined, versions: new Map(), updates: new Map() }),
         );
 
         assert.deepStrictEqual(p.rootDirs.map((d: PathElement) => d.name), ['Standard Library']);

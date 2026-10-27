@@ -42,6 +42,8 @@ class FakeSource implements TreeSource {
         return path.includes('lib') ? 'v1.0.0' : undefined;
     }
 
+    updateOf?: (path: string) => string | undefined;
+
     async refreshTree(calcChanges: boolean, useCache: boolean): Promise<RemovedAddedDirs | undefined> {
         this.refreshCalls.push({ calcChanges, useCache });
         return undefined;
@@ -147,6 +149,57 @@ describe('GoTreeModel', () => {
         const lib = (await model.getChildren(root)).find(c => c.label === 'lib')!;
         const libApplied = model.getTreeItem(lib) as any;
         expect(libApplied.description).toBe('v1.0.0');
+    });
+
+    it('description composes version and available update', async () => {
+        const source = new FakeSource([rootElement]);
+        source.updateOf = path => (path.includes('lib') ? 'v2.0.0' : undefined);
+        const model = new GoTreeModel(source, readDirOf(tree));
+
+        const [root] = await model.getChildren();
+        await model.getChildren(root);
+        const lib = (await model.getChildren(root)).find(c => c.label === 'lib')!;
+
+        expect((model.getTreeItem(lib) as any).description).toBe('v1.0.0 → v2.0.0');
+        expect((model.getTreeItem(root) as any).description).toBeUndefined();
+    });
+
+    it('expand state survives refresh through the expand store', async () => {
+        const store = new Map<string, boolean>();
+        const expandStore = {
+            isExpanded: (id: string) => store.get(id) === true,
+            setExpanded: (id: string, expanded: boolean) => { store.set(id, expanded); },
+        };
+        const model = new GoTreeModel(new FakeSource([rootElement]), readDirOf(tree), expandStore);
+
+        const [root] = await model.getChildren();
+        const children = await model.getChildren(root);
+        const lib = children.find(c => c.label === 'lib')!;
+        model.onExpand(lib as any);
+
+        await model.refresh(true);
+        const [restoredRoot] = await model.getChildren();
+        const restoredChildren = await model.getChildren(restoredRoot);
+        const restoredLib = restoredChildren.find(c => c.label === 'lib')!;
+
+        expect((model.getTreeItem(restoredLib) as any).isExpanded).toBe(true);
+        expect((model.getTreeItem(restoredRoot) as any).isExpanded).toBe(false);
+    });
+
+    it('collapse is persisted through the expand store', async () => {
+        const store = new Map<string, boolean>();
+        const expandStore = {
+            isExpanded: (id: string) => store.get(id) === true,
+            setExpanded: (id: string, expanded: boolean) => { store.set(id, expanded); },
+        };
+        const model = new GoTreeModel(new FakeSource([rootElement]), readDirOf(tree), expandStore);
+
+        const [root] = await model.getChildren();
+        model.onExpand(root);
+        model.onCollapse(root);
+
+        expect(store.get(root.id)).toBe(false);
+        expect((model.getTreeItem(root) as any).isExpanded).toBe(false);
     });
 
     it('getParent resolves parent of a file via linked children', async () => {

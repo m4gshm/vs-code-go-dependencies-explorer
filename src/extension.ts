@@ -45,7 +45,7 @@ async function activateWithGo(context: ExtensionContext, goExtensionApi: GoExten
 
         const { treeView, refresh } = await createTreeView(context, treeProvider);
 
-        registerCommands(context, goExec, treeProvider, treeView, refresh);
+        registerCommands(context, goExec, goPackDirProvider, treeProvider, treeView, refresh);
 
         console.log('Go Dependencies Explorer activated');
         await commands.executeCommand('setContext', 'go.dependencies.explorer.show', true);
@@ -94,7 +94,7 @@ async function registerGitRepoGuard(context: ExtensionContext, goExec: GoExec) {
     }));
 }
 
-function registerCommands(context: ExtensionContext, goExec: GoExec, treeProvider: GoDependenciesStateProvider, treeView: TreeView<TreeItem>, refresh: (force?: boolean) => Promise<void>) {
+function registerCommands(context: ExtensionContext, goExec: GoExec, goPackDirProvider: GoPackageProvider, treeProvider: GoDependenciesStateProvider, treeView: TreeView<TreeItem>, refresh: (force?: boolean) => Promise<void>) {
     const subscriptions = context.subscriptions;
 
     const searchIn = async (filesToInclude: string) => {
@@ -105,6 +105,24 @@ function registerCommands(context: ExtensionContext, goExec: GoExec, treeProvide
     };
 
     const getModulesPath = async () => (await getGoPackagePaths(goExec)).modulePath;
+
+    const checkModuleUpdates = async () => {
+        const conf = workspace.getConfiguration('go.dependencies.explorer');
+        if (!conf.get('check.module.updates', false)) {
+            void window.showInformationMessage('Module update check is disabled. Enable "go.dependencies.explorer.check.module.updates" to use it.');
+            return;
+        }
+        const goproxy = conf.get('updates.goproxy', '');
+        await window.withProgress({ location: { viewId: "go.dependencies.explorer" }, title: 'Checking module updates…' }, async () => {
+            try {
+                await goPackDirProvider.fetchModuleUpdates(goproxy || undefined);
+                await refresh(false);
+            } catch (err) {
+                const message = err instanceof Error ? err.message : `${err}`;
+                void window.showWarningMessage(`Module update check failed: ${message} If the default proxy is unreachable, set "go.dependencies.explorer.updates.goproxy" to a reachable mirror (e.g. a corporate one) or "direct"/"off".`);
+            }
+        });
+    };
 
     const goToPackage = async () => {
         const items: (QuickPickItem & { path: string })[] = treeProvider.dirs.map(dir => ({
@@ -123,6 +141,7 @@ function registerCommands(context: ExtensionContext, goExec: GoExec, treeProvide
 
     subscriptions.push(
         commands.registerCommand('go.dependencies.refresh', async () => await refresh(true)),
+        commands.registerCommand('go.dependencies.check.module.updates', checkModuleUpdates),
         commands.registerCommand('go.dependencies.go.to.package', goToPackage),
         commands.registerCommand('go.dependencies.search.in.all.directories', async _ => {
             const dirs = treeProvider.rootDirs

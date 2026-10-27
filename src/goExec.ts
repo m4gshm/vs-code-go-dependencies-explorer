@@ -101,17 +101,36 @@ export class GoExec {
         }).filter(module => module.dir.length > 0);
     }
 
-    private execGo(args: string[], workDir: WorkDir = undefined, throwStdErr = true) {
-        return this.exec(this.goPath, args, workDir, throwStdErr);
+    public async getModuleUpdates(workDir: string, goproxy: string | undefined = undefined): Promise<Map<string, string>> {
+        const args = ['list', '-m', '-u', '-f', '{{.Dir}}=>{{.Update.Version}}', 'all'];
+        const result = await this.execGo(args, workDir, true, goproxy ? { GOPROXY: goproxy } : undefined);
+        const updates = new Map<string, string>();
+        for (const line of result.stdout.split('\n')) {
+            const delim = line.indexOf('=>');
+            if (!line || delim <= 0) {
+                continue;
+            }
+            const dir = normalizeWinPath(line.slice(0, delim));
+            const version = line.slice(delim + 2);
+            if (dir && version) {
+                updates.set(dir, version);
+            }
+        }
+        return updates;
     }
 
-    private async exec(command: string, args: string[], workDir: WorkDir, throwStdErr = true): Promise<{ stdout: string; stderr?: string }> {
+    private execGo(args: string[], workDir: WorkDir = undefined, throwStdErr = true, extraEnv: Record<string, string> | undefined = undefined) {
+        return this.exec(this.goPath, args, workDir, throwStdErr, extraEnv);
+    }
+
+    private async exec(command: string, args: string[], workDir: WorkDir, throwStdErr = true, extraEnv: Record<string, string> | undefined = undefined): Promise<{ stdout: string; stderr?: string }> {
         if (workDir && !fs.existsSync(workDir)) {
             throw new Error(`The working directory does not exist: ${workDir}`);
         }
         const cwd = typeof workDir === 'string' ? workDir : undefined;
+        const env = extraEnv ? { ...process.env, ...extraEnv } : undefined;
         try {
-            const { stdout, stderr } = await execFile(command, args, { cwd, encoding: 'utf8' });
+            const { stdout, stderr } = await execFile(command, args, { cwd, encoding: 'utf8', env, timeout: 120000 });
             return this.handleExecResult(stdout, stderr, [command, ...args], throwStdErr);
         } catch (err) {
             const execErr = err as cp.ExecFileException & { stdout?: string; stderr?: string };

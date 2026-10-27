@@ -14,7 +14,13 @@ export interface TreeSource {
     rootDirs(): PathElement[];
     findDir(path: string): PathElement | undefined;
     versionOf(path: string): string | undefined;
+    updateOf?(path: string): string | undefined;
     refreshTree(calcChanges: boolean, useCache: boolean): Promise<RemovedAddedDirs | undefined>;
+}
+
+export interface ExpandStateStore {
+    isExpanded(id: string): boolean;
+    setExpanded(id: string, expanded: boolean): void;
 }
 
 export type ModelNode = GoDirNode | GoFileNode;
@@ -53,6 +59,7 @@ export class GoTreeModel {
     constructor(
         private readonly source: TreeSource,
         private readonly readDir: ReadDir,
+        private readonly expandStore: ExpandStateStore | undefined = undefined,
     ) { }
 
     elementById(id: string | undefined): ModelNode | undefined {
@@ -75,16 +82,24 @@ export class GoTreeModel {
         const found = this.state.element(node.id) ?? this.state.add(node);
         if (found instanceof GoDirNode) {
             found.isExpanded = this.state.isExpanded(found.id);
-            found.description = this.source.versionOf(found.id);
+            found.description = this.descriptionOf(found.id);
         }
         return found;
+    }
+
+    private descriptionOf(id: string) {
+        const version = this.source.versionOf(id);
+        const update = this.source.updateOf?.(id);
+        return update ? `${version} → ${update}` : version;
     }
 
     async getChildren(node?: ModelNode): Promise<ModelNode[]> {
         if (!node) {
             return this.source.rootDirs().map(d => {
                 const existing = this.state.element(d.path);
-                return existing && existing instanceof GoDirNode ? existing : this.state.add(new GoDirNode(d));
+                const root = existing && existing instanceof GoDirNode ? existing : this.state.add(new GoDirNode(d));
+                this.restoreExpanded(root);
+                return root;
             });
         }
         const cached = this.state.childrenOf(node.id);
@@ -134,10 +149,12 @@ export class GoTreeModel {
 
     onExpand(node: ModelNode) {
         this.state.onExpand(node.id);
+        this.expandStore?.setExpanded(node.id, true);
     }
 
     onCollapse(node: ModelNode) {
         this.state.onCollapse(node.id);
+        this.expandStore?.setExpanded(node.id, false);
     }
 
     private async initChildren(dir: GoDirNode) {
@@ -146,6 +163,13 @@ export class GoTreeModel {
         const subdirs = dir.dir.children.map(d => new GoDirNode(d));
         const children = [...subdirs, ...files];
         this.state.linkChildren(dir.id, children);
+        children.forEach(child => this.restoreExpanded(child));
         return children;
+    }
+
+    private restoreExpanded(node: ModelNode) {
+        if (node instanceof GoDirNode && this.expandStore?.isExpanded(node.id)) {
+            this.state.onExpand(node.id);
+        }
     }
 }

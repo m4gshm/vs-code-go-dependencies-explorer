@@ -45,6 +45,16 @@
           "type": "boolean",
           "default": true,
           "description": "Cache package directory scans of the standard library and GOMODCACHE modules between refreshes. Disable to perform a full rescan on every refresh."
+        },
+        "go.dependencies.explorer.check.module.updates": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allow the \"Check for Module Updates\" command to query available module updates. The check requires network access and only runs when triggered manually."
+        },
+        "go.dependencies.explorer.updates.goproxy": {
+          "type": "string",
+          "default": "",
+          "description": "GOPROXY override for the module update check, e.g. a corporate mirror. Accepts any GOPROXY value (module proxy URL, comma-separated fallback list, \"direct\", \"off\"). Empty uses the go toolchain default."
         }
       }
     },
@@ -79,6 +89,13 @@
         "description": "Quick pick a dependency package and reveal it in the tree",
         "category": "Explorer",
         "icon": "$(go-to-file)"
+      },
+      {
+        "command": "go.dependencies.check.module.updates",
+        "title": "Check for Module Updates",
+        "description": "Query available updates for the workspace modules and show them in the tree",
+        "category": "Explorer",
+        "icon": "$(cloud-download)"
       },
       {
         "command": "go.dependencies.copy.path",
@@ -133,6 +150,11 @@
         },
         {
           "command": "go.dependencies.go.to.package",
+          "when": "view == go.dependencies.explorer",
+          "group": "navigation"
+        },
+        {
+          "command": "go.dependencies.check.module.updates",
           "when": "view == go.dependencies.explorer",
           "group": "navigation"
         }
