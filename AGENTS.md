@@ -79,7 +79,9 @@ When changing behavior, update `README.md` and the setting descriptions in
 - Scans of std-lib and `GOMODCACHE` dirs are cached per session (`DirScanCache`
   in `GoPackageProvider`) — those trees are immutable; replaced/local dirs are
   never cached. `refresh(force=true)` bypasses and clears the cache, watcher
-  and workspace refreshes use it.
+  and workspace refreshes use it. The cache can be disabled at runtime with
+  the `go.dependencies.explorer.use.scan.cache` setting (checked on every
+  refresh in `GoTreeDataProvider.refresh`).
 
 ## Conventions
 

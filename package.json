@@ -40,6 +40,11 @@
           ],
           "default": "ask",
           "description": "Prevent opening git repositories by opening files from \"Standard Library\" or \"External Packages\"."
+        },
+        "go.dependencies.explorer.use.scan.cache": {
+          "type": "boolean",
+          "default": true,
+          "description": "Cache package directory scans of the standard library and GOMODCACHE modules between refreshes. Disable to perform a full rescan on every refresh."
         }
       }
     },

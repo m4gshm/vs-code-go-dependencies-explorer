@@ -176,7 +176,8 @@ export class GoTreeDataProvider implements TreeDataProvider<TreeItem>, Disposabl
   }
 
   async refresh(force = false) {
-    await this.model.refresh(force);
+    const useCache = workspace.getConfiguration('go.dependencies.explorer').get('use.scan.cache', true);
+    await this.model.refresh(force, useCache);
     this._onDidChangeTreeData.fire(undefined);
   }
 

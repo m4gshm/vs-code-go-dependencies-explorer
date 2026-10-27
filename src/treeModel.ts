@@ -59,11 +59,11 @@ export class GoTreeModel {
         return this.state.element(id);
     }
 
-    async refresh(force = false) {
+    async refresh(force = false, useCache = true) {
         if (force) {
             this.state.clear();
         }
-        const changes = await this.source.refreshTree(!force, !force);
+        const changes = await this.source.refreshTree(!force, !force && useCache);
         if (!force && changes) {
             changes.removedStdDirs?.forEach(d => this.state.deleteDeep(d.path));
             changes.removedModuleDirs?.forEach(d => this.state.deleteDeep(d.path));

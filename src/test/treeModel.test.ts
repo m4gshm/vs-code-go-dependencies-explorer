@@ -186,6 +186,15 @@ describe('GoTreeModel', () => {
         ]);
     });
 
+    it('refresh honors disabled cache', async () => {
+        const source = new FakeSource([rootElement]);
+        const model = new GoTreeModel(source, readDirOf(tree));
+
+        await model.refresh(false, false);
+
+        expect(source.refreshCalls).toEqual([{ calcChanges: true, useCache: false }]);
+    });
+
     it('refresh applies removed dirs from diff', async () => {
         class RemovingSource extends FakeSource {
             async refreshTree(calcChanges: boolean, useCache: boolean) {
