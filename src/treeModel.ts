@@ -13,8 +13,7 @@ export type ReadDir = (dirPath: string) => Promise<DirEntry[]>;
 export interface TreeSource {
     rootDirs(): PathElement[];
     findDir(path: string): PathElement | undefined;
-    versionOf(path: string): string | undefined;
-    updateOf?(path: string): string | undefined;
+    updateOf(path: string): string | undefined;
     refreshTree(calcChanges: boolean, useCache: boolean): Promise<RemovedAddedDirs | undefined>;
 }
 
@@ -88,12 +87,8 @@ export class GoTreeModel {
     }
 
     private descriptionFor(node: GoDirNode) {
-        const version = this.source.versionOf(node.id);
-        const update = this.source.updateOf?.(node.id);
-        if (update) {
-            return `${version && !node.label.includes(version) ? version + ' → ' : '→ '}${update}`;
-        }
-        return version && !node.label.includes(version) ? version : undefined;
+        const update = this.source.updateOf(node.id);
+        return update ? `→ ${update}` : undefined;
     }
 
     async getChildren(node?: ModelNode): Promise<ModelNode[]> {

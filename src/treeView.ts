@@ -181,7 +181,6 @@ export class GoTreeDataProvider implements TreeDataProvider<TreeItem>, Disposabl
     const source: TreeSource = {
       rootDirs: () => treeProvider.rootDirs,
       findDir: path => treeProvider.findDir(path),
-      versionOf: path => treeProvider.versionOf(path),
       updateOf: path => treeProvider.updateOf(path),
       refreshTree: (calcChanges, useCache) => treeProvider.refresh(calcChanges, useCache),
     };

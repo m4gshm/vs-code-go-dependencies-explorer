@@ -25,7 +25,6 @@ export type WorkDir = string | URL | undefined;
 export interface GoModule {
     path: string;
     dir: string;
-    version: string;
     replaced: boolean;
 }
 
@@ -83,7 +82,7 @@ export class GoExec {
 
     public async getModules(moduleName: string | undefined = undefined, workDir: string): Promise<GoModule[]> {
         const delim = '=>';
-        const fields = ['{{.Path}}', '{{.Dir}}', '{{.Version}}', '{{if not (eq .Replace nil)}}replaced{{end}}'];
+        const fields = ['{{.Path}}', '{{.Dir}}', '{{if not (eq .Replace nil)}}replaced{{end}}'];
         const args = ['list', '-f', fields.join(delim), '-m', '-e'];
         if (moduleName) {
             args.push(moduleName);
@@ -95,8 +94,7 @@ export class GoExec {
             return {
                 path: parts[0],
                 dir: dir ? normalizeWinPath(dir) : '',
-                version: parts.length > 2 ? parts[2] : '',
-                replaced: parts[3] === 'replaced',
+                replaced: parts[2] === 'replaced',
             };
         }).filter(module => module.dir.length > 0);
     }
