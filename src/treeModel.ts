@@ -82,15 +82,18 @@ export class GoTreeModel {
         const found = this.state.element(node.id) ?? this.state.add(node);
         if (found instanceof GoDirNode) {
             found.isExpanded = this.state.isExpanded(found.id);
-            found.description = this.descriptionOf(found.id);
+            found.description = this.descriptionFor(found);
         }
         return found;
     }
 
-    private descriptionOf(id: string) {
-        const version = this.source.versionOf(id);
-        const update = this.source.updateOf?.(id);
-        return update ? `${version} → ${update}` : version;
+    private descriptionFor(node: GoDirNode) {
+        const version = this.source.versionOf(node.id);
+        const update = this.source.updateOf?.(node.id);
+        if (update) {
+            return `${version && !node.label.includes(version) ? version + ' → ' : '→ '}${update}`;
+        }
+        return version && !node.label.includes(version) ? version : undefined;
     }
 
     async getChildren(node?: ModelNode): Promise<ModelNode[]> {

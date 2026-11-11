@@ -38,7 +38,7 @@ class FakeSource implements TreeSource {
         return this.dirs.get(path);
     }
 
-    versionOf(path: string) {
+    versionOf(path: string): string | undefined {
         return path.includes('lib') ? 'v1.0.0' : undefined;
     }
 
@@ -162,6 +162,27 @@ describe('GoTreeModel', () => {
 
         expect((model.getTreeItem(lib) as any).description).toBe('v1.0.0 → v2.0.0');
         expect((model.getTreeItem(root) as any).description).toBeUndefined();
+    });
+
+    it('description hides the version already present in the node name', async () => {
+        const versioned: FakeDir = { name: 'go-spew@v1.1.1', files: ['spew.go'] };
+        const treeWithVersioned: FakeDir = { name: 'root', dirs: [versioned] };
+        const versionedRoot = pathElement(treeWithVersioned);
+        const source = new FakeSource([versionedRoot]);
+        source.versionOf = path => (path.includes('@') ? 'v1.1.1' : undefined);
+        source.updateOf = path => (path.includes('@') ? 'v1.2.0' : undefined);
+        const model = new GoTreeModel(source, readDirOf(treeWithVersioned));
+
+        const [root] = await model.getChildren();
+        const [spew] = await model.getChildren(root);
+        expect((model.getTreeItem(spew as any) as any).description).toBe('→ v1.2.0');
+
+        const sourceWithoutUpdate = new FakeSource([versionedRoot]);
+        sourceWithoutUpdate.versionOf = source.versionOf;
+        const model2 = new GoTreeModel(sourceWithoutUpdate, readDirOf(treeWithVersioned));
+        const [root2] = await model2.getChildren();
+        const [spew2] = await model2.getChildren(root2);
+        expect((model2.getTreeItem(spew2 as any) as any).description).toBeUndefined();
     });
 
     it('expand state survives refresh through the expand store', async () => {
