@@ -71,12 +71,11 @@
         "go.dependencies.explorer.block.import.doc.links": {
           "type": "string",
           "enum": [
-            "ask",
             "on",
             "off"
           ],
-          "default": "ask",
-          "description": "Control auto-opening of pkg.go.dev from the editor (go.editorContextMenuCommands.links): `ask` disables it on startup and explains the change once, `on` keeps it disabled on every startup, `off` leaves the Go extension behavior untouched. Choosing \"Restore\" in the startup message reverts the change."
+          "default": "off",
+          "description": "Control auto-opening of pkg.go.dev on Ctrl+Click over import paths. When never set, the extension asks on first startup: `on` keeps gopls importShortcut at \"Definition\" (jump to source) and the \"Open pkg.go.dev\" editor command disabled, restarting the language server after changes; `off` leaves the editor behavior untouched."
         }
       }
     },

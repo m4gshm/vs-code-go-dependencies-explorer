@@ -1,47 +1,63 @@
-import { ConfigurationTarget, ExtensionContext, WorkspaceConfiguration, window, workspace } from 'vscode';
+import { commands, ConfigurationTarget, ExtensionContext, WorkspaceConfiguration, window, workspace } from 'vscode';
 
 const CONTEXT_COMMANDS_KEY = 'editorContextMenuCommands';
-const PREVIOUS_COMMANDS_KEY = 'importLinks.previousContextMenuCommands';
-const DECIDED_KEY = 'importLinks.decided';
+const PREVIOUS_KEY = 'importLinks.previous';
+const APPLIED_KEY = 'importLinks.applied';
 
 export async function manageImportDocLinks(context: ExtensionContext, conf: WorkspaceConfiguration) {
-    const mode = conf.get<'ask' | 'on' | 'off'>('block.import.doc.links', 'ask');
-    if (mode === 'off') {
+    const explicitMode = conf.inspect<'on' | 'off'>('block.import.doc.links')?.globalValue;
+    if (explicitMode === 'off') {
+        if (context.globalState.get<boolean>(APPLIED_KEY)) {
+            await restoreLinksCommand(context);
+            restartLanguageServer();
+        }
         return;
     }
-    await disableLinksCommand(context);
-    if (mode === 'on' || context.globalState.get<boolean>(DECIDED_KEY)) {
+    const changed = await disableLinksCommand(context);
+    if (explicitMode === 'on' || !changed) {
         return;
     }
+    restartLanguageServer();
     void window.showWarningMessage(
-        'Ctrl+Click on import paths no longer opens pkg.go.dev automatically: the "Open pkg.go.dev" editor context command is disabled. Change it via go.dependencies.explorer.block.import.doc.links.',
+        'Ctrl+Click on import paths now jumps to the package source instead of opening pkg.go.dev: the gopls "importShortcut" is set to Definition and the "Open pkg.go.dev" editor command is disabled. Choose whether to keep this behavior (setting go.dependencies.explorer.block.import.doc.links).',
         'Keep disabled', 'Restore').then(async selection => {
-            await context.globalState.update(DECIDED_KEY, true);
             if (selection === 'Restore') {
                 await conf.update('block.import.doc.links', 'off', ConfigurationTarget.Global);
                 await restoreLinksCommand(context);
+                restartLanguageServer();
+            } else {
+                await conf.update('block.import.doc.links', 'on', ConfigurationTarget.Global);
             }
         });
 }
 
-async function disableLinksCommand(context: ExtensionContext) {
+function restartLanguageServer() {
+    Promise.resolve(commands.executeCommand('go.languageserver.restart')).catch(() => { });
+}
+
+async function disableLinksCommand(context: ExtensionContext): Promise<boolean> {
     const goConf = workspace.getConfiguration('go');
-    const inspected = goConf.inspect<Record<string, unknown>>(CONTEXT_COMMANDS_KEY);
-    const current = inspected?.globalValue ?? {};
-    if (current.links === false) {
-        return;
+    const commands = goConf.inspect<Record<string, unknown>>(CONTEXT_COMMANDS_KEY)?.globalValue;
+    const goplsSettings = workspace.getConfiguration().inspect<Record<string, any>>('gopls')?.globalValue;
+    const importShortcut = goplsSettings?.['ui.navigation.importShortcut'];
+    if (commands?.links === false && importShortcut === 'Definition') {
+        return false;
     }
-    if (inspected?.globalValue === undefined) {
-        await context.globalState.update(PREVIOUS_COMMANDS_KEY, undefined);
-    } else {
-        await context.globalState.update(PREVIOUS_COMMANDS_KEY, current);
-    }
-    await goConf.update(CONTEXT_COMMANDS_KEY, { ...current, links: false }, ConfigurationTarget.Global);
+    await context.globalState.update(PREVIOUS_KEY, { commands, goplsSettings });
+    await context.globalState.update(APPLIED_KEY, true);
+    await goConf.update(CONTEXT_COMMANDS_KEY, { ...commands, links: false }, ConfigurationTarget.Global);
+    await workspace.getConfiguration().update('gopls', withImportShortcut(goplsSettings, 'Definition'), ConfigurationTarget.Global);
+    return true;
+}
+
+function withImportShortcut(settings: Record<string, any> | undefined, value: string) {
+    return { ...(settings ?? {}), 'ui.navigation.importShortcut': value };
 }
 
 async function restoreLinksCommand(context: ExtensionContext) {
-    const previous = context.globalState.get<Record<string, unknown> | undefined>(PREVIOUS_COMMANDS_KEY);
-    const goConf = workspace.getConfiguration('go');
-    await goConf.update(CONTEXT_COMMANDS_KEY, previous, ConfigurationTarget.Global);
-    await context.globalState.update(PREVIOUS_COMMANDS_KEY, undefined);
+    const previous = context.globalState.get<{ commands?: Record<string, unknown>; goplsSettings?: Record<string, any> } | undefined>(PREVIOUS_KEY);
+    await workspace.getConfiguration('go').update(CONTEXT_COMMANDS_KEY, previous?.commands, ConfigurationTarget.Global);
+    await workspace.getConfiguration().update('gopls', previous?.goplsSettings, ConfigurationTarget.Global);
+    await context.globalState.update(PREVIOUS_KEY, undefined);
+    await context.globalState.update(APPLIED_KEY, undefined);
 }
