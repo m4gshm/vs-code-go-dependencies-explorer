@@ -65,6 +65,8 @@ npm run test          # unit + bundle + integration tests (@vscode/test-electron
 npm run package       # prepublish chain + vsce package → .vsix
 ```
 
+Releases publish the built `.vsix` to the VS Code Marketplace (`VSCE_PAT` secret) and to the Open VSX Registry for VSCodium and other editors (`OPEN_VSX_TOKEN` secret) from the `Handle Release` workflow.
+
 Debug with F5 (Run Extension). The integration tests use the stub Go workspace in `goWorkspace/go_stub`.
 
 ## License

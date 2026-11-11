@@ -24,6 +24,14 @@ jobs:
           xvfb-run -a npm ci
           xvfb-run -a npm run build
           xvfb-run -a npm run package
+      - name: publish to VS Code Marketplace
+        run: npx vsce publish --no-dependencies --packagePath *.vsix
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+      - name: publish to Open VSX Registry
+        run: npx ovsx publish --packagePath *.vsix
+        env:
+          OPEN_VSX_TOKEN: ${{ secrets.OPEN_VSX_TOKEN }}
       - name: upload the artifacts
         uses: skx/github-action-publish-binaries@master
         env:
