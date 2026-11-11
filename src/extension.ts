@@ -1,5 +1,6 @@
 import {
     commands, env, extensions, ExtensionContext, QuickPickItem, TreeItem, TreeView, Uri, window, workspace,
+    WorkspaceConfiguration,
 } from 'vscode';
 import { createTreeView, getFsUriOfSelectedItem, GoDirItem } from "./treeView";
 import { GoExec } from './goExec';
@@ -10,6 +11,7 @@ import { getGoPackagePaths } from './goDirs';
 import { IFindInFilesArgs } from './search';
 import { GoDependenciesStateProvider } from './goDependenciesStateProvider';
 import { importPathOfDir, modulePathOfDir } from './goModulePath';
+import { manageImportDocLinks } from './importLinks';
 
 let activated: boolean;
 let activating: Promise<any> | undefined;
@@ -40,7 +42,10 @@ async function activateWithGo(context: ExtensionContext, goExtensionApi: GoExten
     try {
         const goExec = new GoExec(getGoBinPath(goExtensionApi));
 
-        await registerGitRepoGuard(context, goExec);
+        const conf = workspace.getConfiguration('go.dependencies.explorer');
+        await manageImportDocLinks(context, conf);
+
+        await registerGitRepoGuard(context, conf, goExec);
 
         const goPackDirProvider = new GoPackageProvider(goExec);
         const treeProvider = await GoDependenciesStateProvider.new(goPackDirProvider);
@@ -60,7 +65,7 @@ async function activateWithGo(context: ExtensionContext, goExtensionApi: GoExten
     }
 }
 
-async function registerGitRepoGuard(context: ExtensionContext, goExec: GoExec) {
+async function registerGitRepoGuard(context: ExtensionContext, conf: WorkspaceConfiguration, goExec: GoExec) {
     const gitExtension = extensions.getExtension<GitExtension>('vscode.git');
     if (!gitExtension) {
         return;
@@ -70,8 +75,6 @@ async function registerGitRepoGuard(context: ExtensionContext, goExec: GoExec) {
     if (!gitApi) {
         return;
     }
-    const rootConfig = 'go.dependencies.explorer';
-    const conf = workspace.getConfiguration(rootConfig);
 
     context.subscriptions.push(gitApi.onDidOpenRepository(async repository => {
         const preventOpenRepo = conf.get('prevent.open.git.repo');

@@ -18,6 +18,7 @@ A VS Code extension that adds an explorer view for browsing the Go standard libr
 - **Scan cache** — package directory scans of the standard library and `GOMODCACHE` modules are cached per session; those trees are immutable (module versions live in directory names), so incremental refreshes rescan only replaced/local dirs. The `Refresh` command always performs a full rescan and resets the cache; the cache can be disabled with `go.dependencies.explorer.use.scan.cache`.
 - **Progress** — rescans show progress on the view itself.
 - **Git guard** — a git repository accidentally opened inside package directories can be closed automatically.
+- **Import link control** — by default the extension disables the Go extension's "Open pkg.go.dev" editor command (so Ctrl+Click on import paths stops silently opening the site), explains it once and lets you keep or revert the behavior — via the message or the `block.import.doc.links` setting.
 - **Non-blocking** — `go` commands and directory scans run asynchronously, the extension host is never frozen.
 
 ## Setup
@@ -50,6 +51,7 @@ A VS Code extension that adds an explorer view for browsing the Go standard libr
 | `go.dependencies.explorer.use.scan.cache` | `true` | Cache package directory scans of the standard library and `GOMODCACHE` modules between refreshes. Set to `false` to perform a full rescan on every refresh |
 | `go.dependencies.explorer.check.module.updates` | `false` | Allow the "Check for Module Updates" command to query available module updates. Requires network access, runs only when triggered manually |
 | `go.dependencies.explorer.updates.goproxy` | *(empty)* | `GOPROXY` override for the module update check — a corporate mirror URL, a comma-separated fallback list, `direct` or `off`. Empty uses the go toolchain default |
+| `go.dependencies.explorer.block.import.doc.links` | `ask` | Control auto-opening of pkg.go.dev from the editor (`go.editorContextMenuCommands.links`): `ask` disables it on startup and explains the change once, `on` keeps it disabled on every startup, `off` leaves the Go extension behavior untouched |
 
 ## Building and testing
 

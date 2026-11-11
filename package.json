@@ -55,6 +55,16 @@
           "type": "string",
           "default": "",
           "description": "GOPROXY override for the module update check, e.g. a corporate mirror. Accepts any GOPROXY value (module proxy URL, comma-separated fallback list, \"direct\", \"off\"). Empty uses the go toolchain default."
+        },
+        "go.dependencies.explorer.block.import.doc.links": {
+          "type": "string",
+          "enum": [
+            "ask",
+            "on",
+            "off"
+          ],
+          "default": "ask",
+          "description": "Control auto-opening of pkg.go.dev from the editor (go.editorContextMenuCommands.links): `ask` disables it on startup and explains the change once, `on` keeps it disabled on every startup, `off` leaves the Go extension behavior untouched. Choosing \"Restore\" in the startup message reverts the change."
         }
       }
     },
