@@ -36,18 +36,4 @@ suite('GoPackageProvider Test Suite', () => {
         assert.ok(stdlib);
         assert.ok(external);
     });
-
-    test('onRequestPackages event fires when getGoPackages is called', async () => {
-        let eventFired = false;
-        let eventData: any = null;
-        const disposable = provider!.onRequestPackages((data) => {
-            eventFired = true;
-            eventData = data;
-        });
-        await provider!.getPackages();
-        assert.strictEqual(eventFired, true);
-        assert.ok(eventData);
-        assert.strictEqual(eventData.length, 2); // [GoStdLibDirs, GoPackageDirs]
-        disposable.dispose();
-    });
 });

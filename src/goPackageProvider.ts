@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import { parse, join } from 'path';
-import { EventEmitter, workspace, Disposable } from 'vscode';
+import { workspace } from 'vscode';
 import { GoExec } from './goExec';
 import { getModulesPath, getStdLibPath, getGoPackagePaths } from './goDirs';
 import { PathElement, PathTreeBuilder, normalizeWinPath } from './pathTree';
@@ -8,11 +8,8 @@ import { DirScanCache } from './dirScanCache';
 
 export const GO_MOD_PATTERN = '**/go.mod';
 
-export class GoPackageProvider implements Disposable {
+export class GoPackageProvider {
     constructor(private readonly goExec: GoExec, private readonly scanCache: DirScanCache = new DirScanCache()) { }
-
-    private readonly _onRequestPackages = new EventEmitter<[GoStdLibTree, GoModuleTree]>();
-    readonly onRequestPackages = this._onRequestPackages.event;
 
     private updateDirs: Map<string, string> = new Map();
 
@@ -24,9 +21,7 @@ export class GoPackageProvider implements Disposable {
         if (!useCache) {
             this.scanCache.clear();
         }
-        const dirs = await getGoPackages(this.goExec, this.scanCache, this.updateDirs);
-        this._onRequestPackages.fire(dirs);
-        return dirs;
+        return await getGoPackages(this.goExec, this.scanCache, this.updateDirs);
     }
 
     async fetchModuleUpdates(goproxy: string | undefined = undefined): Promise<Map<string, string>> {
@@ -44,10 +39,6 @@ export class GoPackageProvider implements Disposable {
         }
         this.updateDirs = updates;
         return updates;
-    }
-
-    dispose(): void {
-        this._onRequestPackages.dispose();
     }
 }
 
