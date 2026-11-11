@@ -48,13 +48,25 @@
         },
         "go.dependencies.explorer.check.module.updates": {
           "type": "boolean",
-          "default": false,
-          "description": "Allow the \"Check for Module Updates\" command to query available module updates. The check requires network access and only runs when triggered manually."
+          "default": true,
+          "description": "Allow querying available module updates (manually via the \"Check for Module Updates\" command and, if \"updates.autoCheck\" is enabled, on a schedule). Requires network access to the module proxy."
         },
         "go.dependencies.explorer.updates.goproxy": {
           "type": "string",
           "default": "",
           "description": "GOPROXY override for the module update check, e.g. a corporate mirror. Accepts any GOPROXY value (module proxy URL, comma-separated fallback list, \"direct\", \"off\"). Empty uses the go toolchain default."
+        },
+        "go.dependencies.explorer.updates.autoCheck": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically check for module updates once per interval instead of only via the \"Check for Module Updates\" command. Requires \"check.module.updates\". Network failures stay silent and never break the view."
+        },
+        "go.dependencies.explorer.updates.autoCheck.intervalHours": {
+          "type": "number",
+          "default": 1,
+          "minimum": 1,
+          "maximum": 168,
+          "description": "Hours between automatic module update checks. The timestamp persists across sessions; a manual check resets the schedule."
         },
         "go.dependencies.explorer.block.import.doc.links": {
           "type": "string",

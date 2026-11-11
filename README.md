@@ -10,7 +10,7 @@ A VS Code extension that adds an explorer view for browsing the Go standard libr
 
 - **Standard Library** — browse packages and files of the Go standard library (`GOROOT/src`).
 - **External Packages** — browse packages of all modules used in the workspace (`go list -m all` + `GOMODCACHE`), with replaced modules shown on a separate root and module versions shown next to the package nodes.
-- **Module updates** — the `Check for Module Updates` command queries available updates (`go list -m -u all`) and shows them next to the current version (`v1.2.3 → v1.4.0`). Opt-in via `go.dependencies.explorer.check.module.updates`, runs only on manual trigger; a custom `GOPROXY` (e.g. a corporate mirror) can be set with `go.dependencies.explorer.updates.goproxy`.
+- **Module updates** — the `Check for Module Updates` command queries available updates (`go list -m -u all`) and shows them next to the current version (`v1.2.3 → v1.4.0`). Enabled by default (`check.module.updates`); a custom `GOPROXY` (e.g. a corporate mirror) can be set with `go.dependencies.explorer.updates.goproxy`. By default `updates.autoCheck` re-runs the check hourly (`updates.autoCheck.intervalHours`, persisted across sessions, silent on network failures).
 - **Go to Package** — quick pick any dependency package by name or path and reveal it in the tree.
 - **Editor sync** — opening a dependency file reveals it in the tree and marks it read-only for the session, so you do not accidentally edit a dependency.
 - **Persistent expand state** — expanded tree nodes are remembered per workspace and restored in the next session.
@@ -49,8 +49,10 @@ A VS Code extension that adds an explorer view for browsing the Go standard libr
 | --- | --- | --- |
 | `go.dependencies.explorer.prevent.open.git.repo` | `ask` | Prevent opening git repositories located under "Standard Library" or "External Packages": `ask` shows a confirmation, `on` closes them silently, `off` disables the guard |
 | `go.dependencies.explorer.use.scan.cache` | `true` | Cache package directory scans of the standard library and `GOMODCACHE` modules between refreshes. Set to `false` to perform a full rescan on every refresh |
-| `go.dependencies.explorer.check.module.updates` | `false` | Allow the "Check for Module Updates" command to query available module updates. Requires network access, runs only when triggered manually |
+| `go.dependencies.explorer.check.module.updates` | `true` | Allow querying available module updates (manually and, if `updates.autoCheck` is enabled, on a schedule). Requires network access to the module proxy |
 | `go.dependencies.explorer.updates.goproxy` | *(empty)* | `GOPROXY` override for the module update check — a corporate mirror URL, a comma-separated fallback list, `direct` or `off`. Empty uses the go toolchain default |
+| `go.dependencies.explorer.updates.autoCheck` | `true` | Re-run the module update check once per interval instead of only manually. Requires `check.module.updates`; network failures stay silent |
+| `go.dependencies.explorer.updates.autoCheck.intervalHours` | `1` | Hours between automatic update checks (1–168). The timestamp persists across sessions; a manual check resets the schedule |
 | `go.dependencies.explorer.block.import.doc.links` | `ask` | Control auto-opening of pkg.go.dev from the editor (`go.editorContextMenuCommands.links`): `ask` disables it on startup and explains the change once, `on` keeps it disabled on every startup, `off` leaves the Go extension behavior untouched |
 
 ## Building and testing

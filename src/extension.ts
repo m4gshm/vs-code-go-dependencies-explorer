@@ -12,6 +12,7 @@ import { IFindInFilesArgs } from './search';
 import { GoDependenciesStateProvider } from './goDependenciesStateProvider';
 import { importPathOfDir, modulePathOfDir } from './goModulePath';
 import { manageImportDocLinks } from './importLinks';
+import { scheduleAutoUpdateChecks, LAST_UPDATE_CHECK_KEY } from './autoUpdateCheck';
 
 let activated: boolean;
 let activating: Promise<any> | undefined;
@@ -51,6 +52,8 @@ async function activateWithGo(context: ExtensionContext, goExtensionApi: GoExten
         const treeProvider = await GoDependenciesStateProvider.new(goPackDirProvider);
 
         const { treeView, refresh } = await createTreeView(context, treeProvider);
+
+        scheduleAutoUpdateChecks(context, goPackDirProvider, refresh);
 
         registerCommands(context, goExec, goPackDirProvider, treeProvider, treeView, refresh);
 
@@ -121,6 +124,7 @@ function registerCommands(context: ExtensionContext, goExec: GoExec, goPackDirPr
         await window.withProgress({ location: { viewId: "go.dependencies.explorer" }, title: 'Checking module updates…' }, async () => {
             try {
                 await goPackDirProvider.fetchModuleUpdates(goproxy || undefined);
+                context.globalState.update(LAST_UPDATE_CHECK_KEY, Date.now());
                 await refresh(false);
             } catch (err) {
                 const message = err instanceof Error ? err.message : `${err}`;
