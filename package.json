@@ -68,8 +68,17 @@
           "maximum": 168,
           "description": "Hours between automatic module update checks. The timestamp persists across sessions; a manual check resets the schedule."
         },
-        "go.dependencies.explorer.block.import.doc.links": {
+        "go.dependencies.explorer.modified.packages": {
           "type": "string",
+          "enum": [
+            "off",
+            "auto",
+            "ask"
+          ],
+          "default": "ask",
+          "description": "Detect dependency packages modified in GOMODCACHE (checked with 'go mod verify' on every refresh) and restore their pristine copies: \"off\" ignores them, \"auto\" restores silently, \"ask\" shows a warning offering to restore the first detected module, all of them, or ignore."
+        },
+        "go.dependencies.explorer.block.import.doc.links": {          "type": "string",
           "enum": [
             "on",
             "off"

@@ -8,6 +8,8 @@ import {
   TreeItemCollapsibleState, Tab, TabInputText
 } from 'vscode';
 import { GoDependenciesStateProvider } from './goDependenciesStateProvider';
+import { GoPackageProvider } from './goPackageProvider';
+import { checkModifiedPackages } from './modifiedPackages';
 import { PathElement } from './pathTree';
 import { GoDirNode, GoFileNode, GoTreeModel, ModelNode, TreeSource, ExpandStateStore } from './treeModel';
 
@@ -31,7 +33,7 @@ function createExpandStore(ctx: ExtensionContext | undefined): ExpandStateStore 
     };
 }
 
-export async function createTreeView(ctx: ExtensionContext, treeProvider: GoDependenciesStateProvider) {
+export async function createTreeView(ctx: ExtensionContext, treeProvider: GoDependenciesStateProvider, packagesProvider: GoPackageProvider) {
   const subscriptions = ctx.subscriptions;
 
   const treeDataProvider = new GoTreeDataProvider(treeProvider, ctx);
@@ -120,6 +122,8 @@ export async function createTreeView(ctx: ExtensionContext, treeProvider: GoDepe
   async function refresh(force = false) {
     await window.withProgress({ location: { viewId: "go.dependencies.explorer" } },
       () => treeDataProvider.refresh(force));
+    // shortcut: go mod verify hashes every downloaded module and runs on every refresh; gate it to forced refreshes if this becomes slow
+    void checkModifiedPackages(packagesProvider, refresh);
   }
 
   subscriptions.push(registerGoModWatcher(() => refresh()));

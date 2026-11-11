@@ -2,6 +2,7 @@ import cp from 'child_process';
 import fs from 'fs';
 import { URL } from 'url';
 import { normalizeWinPath } from './pathTree';
+import { parseModifiedModules } from './goModulePath';
 
 const execFile = promisifyExecFile();
 
@@ -115,6 +116,15 @@ export class GoExec {
             }
         }
         return updates;
+    }
+
+    public async verifyModules(workDir: string): Promise<string[]> {
+        const result = await this.execGo(['mod', 'verify'], workDir, false);
+        return parseModifiedModules(`${result.stderr ?? ''}\n${result.stdout}`);
+    }
+
+    public async downloadModule(modulePath: string, workDir: string): Promise<void> {
+        await this.execGo(['mod', 'download', modulePath], workDir);
     }
 
     private execGo(args: string[], workDir: WorkDir = undefined, throwStdErr = true, extraEnv: Record<string, string> | undefined = undefined) {

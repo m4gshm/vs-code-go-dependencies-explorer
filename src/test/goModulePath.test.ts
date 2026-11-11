@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { importPathOfDir, modulePathOfDir } from '../goModulePath';
+import { importPathOfDir, modulePathOfDir, parseModifiedModules } from '../goModulePath';
 
 const win = process.platform === 'win32';
 const sep = win ? '\\' : '/';
@@ -34,5 +34,21 @@ describe('importPathOfDir', () => {
 
     it('returns undefined outside of module cache', () => {
         expect(importPathOfDir(['c:', 'tmp'].join(sep), modCache)).toBeUndefined();
+    });
+});
+
+describe('parseModifiedModules', () => {
+    it('extracts module paths of modified modules and ignores ok lines', () => {
+        const output = [
+            'all modules verified',
+            'github.com/user/repo v1.2.3: dir has been modified (c:\\mod\\repo@v1.2.3)',
+            'golang.org/x/mod v0.1.0: ok',
+            'go: github.com/other/mod v2.0.0: checksum mismatch',
+        ].join('\n');
+        expect(parseModifiedModules(output)).toEqual(['github.com/user/repo', 'github.com/other/mod']);
+    });
+
+    it('returns empty when everything is verified', () => {
+        expect(parseModifiedModules('all modules verified\n')).toEqual([]);
     });
 });

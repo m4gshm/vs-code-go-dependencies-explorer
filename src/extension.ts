@@ -51,7 +51,7 @@ async function activateWithGo(context: ExtensionContext, goExtensionApi: GoExten
         const goPackDirProvider = new GoPackageProvider(goExec);
         const treeProvider = await GoDependenciesStateProvider.new(goPackDirProvider);
 
-        const { treeView, refresh } = await createTreeView(context, treeProvider);
+        const { treeView, refresh } = await createTreeView(context, treeProvider, goPackDirProvider);
 
         scheduleAutoUpdateChecks(context, goPackDirProvider, refresh);
 

@@ -27,3 +27,12 @@ function segmentsUnderRoot(dirPath: string, modulesRoot: string): string[] | und
     }
     return rel.split(sep).filter(segment => segment.length > 0);
 }
+
+export function parseModifiedModules(output: string): string[] {
+    const modified = output.split('\n')
+        .map(line => line.trim().replace(/^go:\s*/, ''))
+        .filter(line => line.includes('dir has been modified') || line.includes('checksum mismatch'))
+        .map(line => line.split(/\s+/)[0])
+        .filter(path => path.length > 0);
+    return Array.from(new Set(modified));
+}

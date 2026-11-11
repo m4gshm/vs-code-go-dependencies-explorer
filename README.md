@@ -16,6 +16,7 @@ A VS Code extension that adds an explorer view for browsing the Go standard libr
 - **Persistent expand state** — expanded tree nodes are remembered per workspace and restored in the next session.
 - **Live refresh** — the view updates automatically when `go.mod`/`go.sum` change or workspace folders are added/removed (events are debounced into a single rescan).
 - **Scan cache** — package directory scans of the standard library and `GOMODCACHE` modules are cached per session; those trees are immutable (module versions live in directory names), so incremental refreshes rescan only replaced/local dirs. The `Refresh` command always performs a full rescan and resets the cache; the cache can be disabled with `go.dependencies.explorer.use.scan.cache`.
+- **Modified package restore** — files in `GOMODCACHE` are occasionally changed by accident; every refresh runs `go mod verify` and modified modules can be restored to their pristine copies by re-downloading them (see the `modified.packages` setting).
 - **Progress** — rescans show progress on the view itself.
 - **Git guard** — a git repository accidentally opened inside package directories can be closed automatically.
 - **Import link control** — on first startup (while the setting is not chosen) the extension makes Ctrl+Click on import paths jump to the package source instead of opening pkg.go.dev (sets gopls `importShortcut` to `Definition`, disables the "Open pkg.go.dev" editor command, restarts the language server) and asks whether to keep it; the choice persists in `block.import.doc.links` (`on`/`off`).
@@ -54,6 +55,7 @@ A VS Code extension that adds an explorer view for browsing the Go standard libr
 | `go.dependencies.explorer.updates.autoCheck` | `true` | Re-run the module update check once per interval instead of only manually. Requires `check.module.updates`; network failures stay silent |
 | `go.dependencies.explorer.updates.autoCheck.intervalHours` | `1` | Hours between automatic update checks (1–168). The timestamp persists across sessions; a manual check resets the schedule |
 | `go.dependencies.explorer.block.import.doc.links` | `off` | Control auto-opening of pkg.go.dev on Ctrl+Click over import paths. When never set, the extension asks on first startup: `on` keeps gopls `importShortcut` at `Definition` (jump to source) and the "Open pkg.go.dev" editor command disabled, restarting the language server after changes; `off` leaves the editor behavior untouched |
+| `go.dependencies.explorer.modified.packages` | `ask` | Detect dependency packages modified in `GOMODCACHE` (`go mod verify` on every refresh) and restore their pristine copies by re-downloading the module: `off` ignores modifications, `auto` restores silently, `ask` shows a warning offering to restore the first detected module, all of them, or ignore |
 
 ## Building and testing
 
