@@ -4,9 +4,9 @@ import { GoPackageProvider } from './goPackageProvider';
 // restoreModules triggers a refresh(true) which runs this check again; skip exactly that one
 let skipNextCheck = false;
 
-export async function checkModifiedPackages(provider: GoPackageProvider, refresh: (force?: boolean) => Promise<void>) {
+export async function checkModifiedPackages(provider: GoPackageProvider, refresh: (force?: boolean) => Promise<void>, force = false) {
     const mode = workspace.getConfiguration('go.dependencies.explorer').get<'off' | 'auto' | 'ask'>('modified.packages', 'ask');
-    if (mode === 'off') {
+    if (mode === 'off' || !force) {
         return;
     }
     if (skipNextCheck) {
@@ -41,6 +41,7 @@ async function restore(provider: GoPackageProvider, modulePaths: string[], refre
     try {
         await provider.restoreModules(modulePaths);
         skipNextCheck = true;
+        void window.showInformationMessage(`Restored modified dependency packages: ${modulePaths.join(', ')}`);
         await refresh(true);
     } catch (err) {
         const message = err instanceof Error ? err.message : `${err}`;

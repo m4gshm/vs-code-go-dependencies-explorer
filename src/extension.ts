@@ -133,8 +133,19 @@ function registerCommands(context: ExtensionContext, goExec: GoExec, goPackDirPr
         });
     };
 
-    const goToPackage = async () => {
-        const items: (QuickPickItem & { path: string })[] = treeProvider.dirs.map(dir => ({
+    const restoreModifiedPackages = async () => {
+        await window.withProgress({ location: { viewId: 'go.dependencies.explorer' }, title: 'Restoring modified packages…' }, async () => {
+            const modified = await goPackDirProvider.verifyModifiedModules();
+            if (modified.length === 0) {
+                void window.showInformationMessage('No modified dependency packages found.');
+                return;
+            }
+            await goPackDirProvider.restoreModules(modified);
+            await refresh(true);
+        });
+    };
+
+    const goToPackage = async () => {        const items: (QuickPickItem & { path: string })[] = treeProvider.dirs.map(dir => ({
             label: dir.name,
             description: dir.path,
             path: dir.path,
@@ -151,6 +162,7 @@ function registerCommands(context: ExtensionContext, goExec: GoExec, goPackDirPr
     subscriptions.push(
         commands.registerCommand('go.dependencies.refresh', async () => await refresh(true)),
         commands.registerCommand('go.dependencies.check.module.updates', checkModuleUpdates),
+        commands.registerCommand('go.dependencies.restore.modified.packages', restoreModifiedPackages),
         commands.registerCommand('go.dependencies.go.to.package', goToPackage),
         commands.registerCommand('go.dependencies.search.in.all.directories', async _ => {
             const dirs = treeProvider.rootDirs

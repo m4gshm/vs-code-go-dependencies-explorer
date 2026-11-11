@@ -76,7 +76,7 @@
             "ask"
           ],
           "default": "ask",
-          "description": "Detect dependency packages modified in GOMODCACHE (checked with 'go mod verify' on every refresh) and restore their pristine copies: \"off\" ignores them, \"auto\" restores silently, \"ask\" shows a warning offering to restore the first detected module, all of them, or ignore."
+          "description": "Detect dependency packages modified in GOMODCACHE (checked with 'go mod verify' on the Refresh command and when restoring) and restore their pristine copies: \"off\" ignores them, \"auto\" restores silently, \"ask\" shows a warning offering to restore the first detected module, all of them, or ignore."
         },
         "go.dependencies.explorer.block.import.doc.links": {          "type": "string",
           "enum": [
@@ -126,6 +126,13 @@
         "description": "Query available updates for the workspace modules and show them in the tree",
         "category": "Explorer",
         "icon": "$(cloud-download)"
+      },
+      {
+        "command": "go.dependencies.restore.modified.packages",
+        "title": "Restore Modified Packages",
+        "description": "Detect dependency packages modified in GOMODCACHE and re-download their pristine copies",
+        "category": "Explorer",
+        "icon": "$(discard)"
       },
       {
         "command": "go.dependencies.copy.path",
@@ -185,6 +192,11 @@
         },
         {
           "command": "go.dependencies.check.module.updates",
+          "when": "view == go.dependencies.explorer",
+          "group": "navigation"
+        },
+        {
+          "command": "go.dependencies.restore.modified.packages",
           "when": "view == go.dependencies.explorer",
           "group": "navigation"
         }

@@ -13,7 +13,7 @@ export class GoPackageProvider {
 
     private updateDirs: Map<string, string> = new Map();
     private workspaceModuleDirs: string[] = [];
-    private cacheModules: Map<string, string> = new Map();
+    private cacheModules: Map<string, { dir: string; rootDir: string }> = new Map();
 
     async getPackagePaths() {
         return await getGoPackagePaths(this.goExec);
@@ -40,17 +40,13 @@ export class GoPackageProvider {
     }
 
     async restoreModules(modulePaths: string[]): Promise<void> {
-        const workDir = this.workspaceModuleDirs[0];
-        if (!workDir) {
-            throw new Error('no workspace module to restore from');
-        }
         for (const modulePath of modulePaths) {
-            const dir = this.cacheModules.get(modulePath);
-            if (!dir) {
+            const module = this.cacheModules.get(modulePath);
+            if (!module) {
                 continue;
             }
-            await fs.promises.rm(dir, { recursive: true, force: true });
-            await this.goExec.downloadModule(modulePath, workDir);
+            await fs.promises.rm(module.dir, { recursive: true, force: true });
+            await this.goExec.downloadModule(modulePath, module.rootDir);
         }
     }
 
@@ -58,14 +54,8 @@ export class GoPackageProvider {
         const extPackagesDir = getModulesPath(await this.goExec.getEnv());
         const updates = new Map<string, string>();
         for (const rootDir of await findWorkspaceModuleDirs(extPackagesDir)) {
-            try {
-                const rootUpdates = await this.goExec.getModuleUpdates(rootDir, goproxy);
-                rootUpdates.forEach((version, dir) => updates.set(dir, version));
-            } catch (err) {
-                const message = err instanceof Error ? err.message : `${err}`;
-                console.info(`module update check failed for '${rootDir}': ${message}`);
-                throw err;
-            }
+            const rootUpdates = await this.goExec.getModuleUpdates(rootDir, goproxy);
+            rootUpdates.forEach((version, dir) => updates.set(dir, version));
         }
         this.updateDirs = updates;
         return updates;
@@ -120,7 +110,7 @@ export class GoPackageProvider {
 
             const moduleDirsSet = new Set<string>();
             const replacedDirsSet = new Set<string>();
-            const cacheModules = new Map<string, string>();
+            const cacheModules = new Map<string, { dir: string; rootDir: string }>();
             for (const wdm of workDirModules) {
                 const err = wdm.error;
                 if (err) {
@@ -133,7 +123,7 @@ export class GoPackageProvider {
                         } else {
                             moduleDirsSet.add(module.dir);
                             if (module.dir.startsWith(extPackagesDir)) {
-                                cacheModules.set(module.path, module.dir);
+                                cacheModules.set(module.path, { dir: module.dir, rootDir: wdm.baseDir });
                             }
                         }
                     }

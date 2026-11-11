@@ -122,8 +122,7 @@ export async function createTreeView(ctx: ExtensionContext, treeProvider: GoDepe
   async function refresh(force = false) {
     await window.withProgress({ location: { viewId: "go.dependencies.explorer" } },
       () => treeDataProvider.refresh(force));
-    // shortcut: go mod verify hashes every downloaded module and runs on every refresh; gate it to forced refreshes if this becomes slow
-    void checkModifiedPackages(packagesProvider, refresh);
+    void checkModifiedPackages(packagesProvider, refresh, force);
   }
 
   subscriptions.push(registerGoModWatcher(() => refresh()));
