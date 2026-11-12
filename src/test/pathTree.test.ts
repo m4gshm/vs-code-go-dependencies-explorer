@@ -1,7 +1,7 @@
 import assert from 'assert';
 import { PathElement, PathTreeBuilder, flat, normalizeWinPath, RootType } from '../pathTree';
 import path from 'node:path';
-import { suite, test } from 'node:test';
+import { suite, test } from 'vitest';
 
 suite('pathTree', () => {
   test('constructor creates directory with correct properties', () => {
@@ -93,7 +93,6 @@ suite('pathTree', () => {
         assert.strictEqual(first.name, 'absolute');
         // The path could be '/absolute' or '\absolute' depending on platform
         assert(first.path.endsWith('absolute'));
-        // Continue down the hierarchy
         assert.strictEqual(first.children.length, 1);
         assert.strictEqual(first.children[0].name, 'path');
         assert(first.children[0].path.endsWith(path.join('absolute', 'path')));
@@ -159,15 +158,12 @@ suite('pathTree', () => {
 
     suite('merge', () => {
       test('merge non-overlapping directories', () => {
-        // Create two hierarchies with same root path
         const builder1 = PathTreeBuilder.create(['/root/dir1'], '/root')!!;
         const builder2 = PathTreeBuilder.create(['/root/dir2'], '/root')!!;
 
-        // They have the same root path, so merge should combine them
         builder1.merge(builder2);
         const result = builder1.toDirectory();
 
-        // The root has subdirectories dir1 and dir2 under it
         // Note: The root label is 'Root', not 'root'
         assert.strictEqual(result.children.length, 2);
         const labels = result.children.map(d => d.name).sort();
@@ -181,7 +177,6 @@ suite('pathTree', () => {
         builder1.merge(builder2);
         const result = builder1.toDirectory();
 
-        // Should have root with dir1 containing two subdirectories
         assert.strictEqual(result.children.length, 1);
         const dir1 = result.children[0];
         assert.strictEqual(dir1.name, 'dir1');
@@ -207,10 +202,9 @@ suite('pathTree', () => {
   });
 
   suite('normalizeWinPath', () => {
-    const runWindowsOnly = { skip: process.platform !== 'win32' ? 'Only for Windows' : false };
+    const runWindowsOnly = process.platform !== 'win32';
 
     test('on non-Windows platform returns unchanged path', () => {
-      // Mock platform to be non-Windows for test consistency
       const originalPlatform = process.platform;
       Object.defineProperty(process, 'platform', { value: 'linux' });
 
@@ -223,14 +217,14 @@ suite('pathTree', () => {
       }
     });
 
-    test('on Windows with uppercase drive letter converts to lowercase', runWindowsOnly, () => {
+    test.skipIf(runWindowsOnly)('on Windows with uppercase drive letter converts to lowercase', () => {
       const path = 'C:\\Windows\\System';
       const result = normalizeWinPath(path);
       assert.strictEqual(result, 'c:\\Windows\\System');
 
     });
 
-    test('on Windows with already lowercase drive letter unchanged', runWindowsOnly, () => {
+    test.skipIf(runWindowsOnly)('on Windows with already lowercase drive letter unchanged', () => {
       const path = 'c:\\Windows\\System';
       const result = normalizeWinPath(path);
       assert.strictEqual(result, path);

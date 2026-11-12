@@ -17,7 +17,7 @@ export async function getGoExtensionAPI(): Promise<GoExtensionAPI | undefined> {
         const isActive = goExtension.isActive;
         const goExtensionApi: GoExtensionAPI | undefined = !isActive ? await goExtension.activate() : goExtension.exports;
         if (!goExtensionApi) {
-            throw Error("'golang.go' desn't export API.");
+            throw Error("'golang.go' doesn't export API.");
         }
         return goExtensionApi;
     }
